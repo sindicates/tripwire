@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "Tripwire",
+    "slug": "tripwire",
+    "scheme": "tripwire",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.tripwire.app"
+    },
+    "android": {
+      "package": "com.tripwire.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#ffffff"
+      }
+    },
+    "plugins": ["expo-router"],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
