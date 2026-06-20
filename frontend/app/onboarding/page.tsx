@@ -1,16 +1,278 @@
-export default function OnboardingPage() {
+"use client"
+
+import { useState } from "react"
+import { useRouter } from "next/navigation"
+import { createClient } from "@/lib/supabase/client"
+
+const YEARS = ["Freshman", "Sophomore", "Junior", "Senior", "Graduate"] as const
+const AID_STATUSES = [
+  "Pell Grant",
+  "Subsidized Loans",
+  "Unsubsidized Loans",
+  "Scholarships Only",
+  "Work-Study",
+  "Mixed Aid",
+  "No Financial Aid",
+] as const
+const HOUSING_OPTIONS = [
+  "On-Campus Dorms",
+  "Off-Campus with Family",
+  "Off-Campus Apartment",
+  "Commuter",
+] as const
+const GPA_RANGES = [
+  "3.7–4.0",
+  "3.3–3.7",
+  "3.0–3.3",
+  "2.7–3.0",
+  "2.3–2.7",
+  "Below 2.3",
+] as const
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-background">
-      <div className="w-full max-w-xl space-y-8 p-8">
-        <div className="space-y-2 text-center">
-          <h1 className="text-3xl font-bold">Set up your profile</h1>
-          <p className="text-muted-foreground">
-            Tell us about your school and academic standing
+    <div>
+      <label className="block text-sm font-medium text-foreground mb-1.5">{label}</label>
+      {children}
+    </div>
+  )
+}
+
+const inputClass =
+  "w-full rounded-lg border border-input bg-white px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition"
+
+const selectClass =
+  "w-full rounded-lg border border-input bg-white px-3.5 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition"
+
+export default function OnboardingPage() {
+  const router = useRouter()
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const [form, setForm] = useState({
+    school: "",
+    year: "",
+    major: "",
+    credits_completed: "",
+    current_classes: "",
+    financial_aid_status: "",
+    work_hours_per_week: "",
+    housing_status: "",
+    gpa_range: "",
+    graduation_goal: "",
+    unmet_financial_need: "",
+  })
+
+  function set(field: keyof typeof form) {
+    return (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+      setForm((prev) => ({ ...prev, [field]: e.target.value }))
+    }
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null)
+    setSaving(true)
+
+    const supabase = createClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      router.push("/login")
+      return
+    }
+
+    const classes = form.current_classes
+      .split("\n")
+      .map((c) => c.trim())
+      .filter(Boolean)
+
+    const { error: dbError } = await supabase.from("students").upsert({
+      user_id: user.id,
+      email: user.email,
+      school: form.school || null,
+      year: form.year || null,
+      major: form.major || null,
+      credits_completed: form.credits_completed ? parseInt(form.credits_completed) : null,
+      current_classes: classes.length ? classes : null,
+      financial_aid_status: form.financial_aid_status || null,
+      work_hours_per_week: form.work_hours_per_week ? parseInt(form.work_hours_per_week) : null,
+      housing_status: form.housing_status || null,
+      gpa_range: form.gpa_range || null,
+      graduation_goal: form.graduation_goal || null,
+      unmet_financial_need: form.unmet_financial_need ? parseInt(form.unmet_financial_need) : null,
+      onboarding_complete: true,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "user_id" })
+
+    if (dbError) {
+      setError(dbError.message)
+      setSaving(false)
+      return
+    }
+
+    router.push("/dashboard")
+  }
+
+  return (
+    <main className="min-h-screen bg-background py-12 px-4">
+      <div className="mx-auto max-w-2xl">
+        <div className="mb-10 text-center">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary mb-4">
+            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+          </div>
+          <h1 className="text-3xl font-bold text-foreground">Set up your profile</h1>
+          <p className="mt-2 text-muted-foreground max-w-md mx-auto">
+            Tell us about your academic situation so Tripwire can monitor your trajectory and catch risks early.
           </p>
         </div>
-        {/* Step 1: school search */}
-        {/* Step 2: GPA + credits */}
-        {/* Step 3: aid package upload */}
+
+        <div className="bg-white rounded-2xl border border-border shadow-sm p-8">
+          <form onSubmit={handleSubmit} className="space-y-6">
+
+            {/* School & Year */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              <Field label="School">
+                <input
+                  type="text"
+                  value={form.school}
+                  onChange={set("school")}
+                  className={inputClass}
+                  placeholder="e.g. UC Berkeley"
+                />
+              </Field>
+              <Field label="Year">
+                <select value={form.year} onChange={set("year")} className={selectClass}>
+                  <option value="">Select year</option>
+                  {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
+                </select>
+              </Field>
+            </div>
+
+            {/* Major & Credits */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              <Field label="Major">
+                <input
+                  type="text"
+                  value={form.major}
+                  onChange={set("major")}
+                  className={inputClass}
+                  placeholder="e.g. Computer Science"
+                />
+              </Field>
+              <Field label="Credits completed">
+                <input
+                  type="number"
+                  min={0}
+                  value={form.credits_completed}
+                  onChange={set("credits_completed")}
+                  className={inputClass}
+                  placeholder="e.g. 60"
+                />
+              </Field>
+            </div>
+
+            {/* Current classes */}
+            <Field label="Current classes (one per line)">
+              <textarea
+                rows={4}
+                value={form.current_classes}
+                onChange={set("current_classes")}
+                className={inputClass + " resize-none"}
+                placeholder={"CS 61B: Data Structures\nMATH 53: Multivariable Calculus\nENG 1A: Expository Writing"}
+              />
+            </Field>
+
+            {/* GPA range & Financial aid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              <Field label="GPA range">
+                <select value={form.gpa_range} onChange={set("gpa_range")} className={selectClass}>
+                  <option value="">Select range</option>
+                  {GPA_RANGES.map((g) => <option key={g} value={g}>{g}</option>)}
+                </select>
+              </Field>
+              <Field label="Financial aid status">
+                <select value={form.financial_aid_status} onChange={set("financial_aid_status")} className={selectClass}>
+                  <option value="">Select status</option>
+                  {AID_STATUSES.map((a) => <option key={a} value={a}>{a}</option>)}
+                </select>
+              </Field>
+            </div>
+
+            {/* Housing & Work hours */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              <Field label="Housing status">
+                <select value={form.housing_status} onChange={set("housing_status")} className={selectClass}>
+                  <option value="">Select housing</option>
+                  {HOUSING_OPTIONS.map((h) => <option key={h} value={h}>{h}</option>)}
+                </select>
+              </Field>
+              <Field label="Work hours per week">
+                <input
+                  type="number"
+                  min={0}
+                  value={form.work_hours_per_week}
+                  onChange={set("work_hours_per_week")}
+                  className={inputClass}
+                  placeholder="e.g. 20"
+                />
+              </Field>
+            </div>
+
+            {/* Graduation goal & Unmet need */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              <Field label="Graduation goal">
+                <input
+                  type="text"
+                  value={form.graduation_goal}
+                  onChange={set("graduation_goal")}
+                  className={inputClass}
+                  placeholder="e.g. Spring 2027"
+                />
+              </Field>
+              <Field label="Unmet financial need ($)">
+                <input
+                  type="number"
+                  min={0}
+                  value={form.unmet_financial_need}
+                  onChange={set("unmet_financial_need")}
+                  className={inputClass}
+                  placeholder="e.g. 8000"
+                />
+              </Field>
+            </div>
+
+            {error && (
+              <div className="rounded-lg bg-destructive/10 border border-destructive/20 px-4 py-3 text-sm text-destructive">
+                {error}
+              </div>
+            )}
+
+            <div className="flex items-center gap-4 pt-2">
+              <button
+                type="submit"
+                disabled={saving}
+                className="flex-1 rounded-lg bg-primary text-primary-foreground py-2.5 px-4 text-sm font-semibold hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition"
+              >
+                {saving ? "Saving…" : "Save profile"}
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push("/dashboard")}
+                className="rounded-lg border border-border text-muted-foreground py-2.5 px-4 text-sm font-medium hover:bg-muted transition"
+              >
+                Skip for now
+              </button>
+            </div>
+
+          </form>
+        </div>
+
+        <p className="mt-6 text-center text-xs text-muted-foreground">
+          You can update your profile at any time from your account settings.
+        </p>
       </div>
     </main>
   )
