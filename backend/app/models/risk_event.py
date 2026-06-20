@@ -4,8 +4,8 @@ from datetime import datetime
 from typing import Any
 
 from sqlalchemy import DateTime, Enum, ForeignKey, String, func
-from sqlalchemy.dialects.postgresql import JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.types import JSON
 
 from app.database import Base
 
@@ -13,7 +13,8 @@ from app.database import Base
 class Severity(str, enum.Enum):
     info = "info"
     warn = "warn"
-    urgent = "urgent"
+    high = "high"      # approaching a threshold (buffer ≤ 0.1 GPA points)
+    urgent = "urgent"  # threshold already breached
 
 
 class RiskEvent(Base):

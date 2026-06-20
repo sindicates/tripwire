@@ -22,4 +22,14 @@ celery_app.conf.timezone = "UTC"
 
 @celery_app.task(name="celery_app.nightly_risk_scan")
 def nightly_risk_scan() -> None:
-    pass
+    import asyncio
+
+    from app.database import AsyncSessionLocal
+    from app.services.risk_engine import RiskEngine
+
+    async def _run() -> None:
+        async with AsyncSessionLocal() as db:
+            engine = RiskEngine(db)
+            await engine.scan_all()
+
+    asyncio.run(_run())
