@@ -28,6 +28,26 @@ export interface School {
   last_ingested_at: string | null
 }
 
+export interface StudentProfile {
+  id: string
+  user_id: string
+  email: string
+  school: string | null
+  year: "Freshman" | "Sophomore" | "Junior" | "Senior" | "Graduate" | null
+  major: string | null
+  credits_completed: number | null
+  current_classes: string[] | null
+  financial_aid_status: string | null
+  work_hours_per_week: number | null
+  housing_status: string | null
+  gpa_range: string | null
+  graduation_goal: string | null
+  unmet_financial_need: number | null
+  onboarding_complete: boolean
+  created_at: string
+  updated_at: string
+}
+
 export interface Student {
   id: string
   email: string
