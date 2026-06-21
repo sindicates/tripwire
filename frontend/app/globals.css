@@ -231,6 +231,15 @@ html {
   letter-spacing: -0.3px;
 }
 
+/* ── Wizard / loading screen animations ── */
+@keyframes sherpa-spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes sherpa-pulse {
+  0%, 100% { opacity: 0.2; transform: scale(0.85); }
+  50%       { opacity: 0.9; transform: scale(1); }
+}
+
 /* ── Hero entry animations (fires on load via CSS keyframe) ── */
 @keyframes fadeUp {
   from { opacity: 0; transform: translateY(16px); }
