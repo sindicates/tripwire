@@ -117,6 +117,13 @@ function RiskCard({ ev }: { ev: RiskEvent }) {
   const isStub = !packet || packet.description === STUB_DESC
   const source = ctx.source
 
+  const handleNavClick = (id: NavId) => {
+    setActiveNav(id)
+    if (id === "advisor") router.push("/chat")
+    else if (id === "actions") router.push("/actions")
+    else if (id === "settings") router.push("/settings")
+  }
+
   return (
     <div className={`rounded-xl border p-5 space-y-3 ${CARD_RING[sev] ?? CARD_RING.warn}`}>
 

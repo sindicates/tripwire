@@ -42,7 +42,10 @@ def _cosine_similarity(a: list[float], b: list[float]) -> float:
 
 
 class RAGService:
-    """Retrieval-augmented generation over school policy documents."""
+    def __init__(self) -> None:
+        self._openai = openai.AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+        self._anthropic = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+        self._enc = tiktoken.get_encoding("cl100k_base")
 
     def __init__(self, db: AsyncSession) -> None:
         self.db = db
