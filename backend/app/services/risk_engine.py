@@ -345,7 +345,7 @@ class RiskEngine:
 
     def __init__(self, db: AsyncSession) -> None:
         self.db = db
-        self.rag = RAGService(db)
+        self.rag = RAGService()
 
     async def _cooldown_ok(self, student_id: uuid.UUID, risk_type: str) -> bool:
         """Return True if no unresolved event of this type was created recently."""
@@ -384,7 +384,7 @@ class RiskEngine:
         }
 
         query = _risk_type_to_query(risk_type, context)
-        chunks = await self.rag.search(query, student.school_id, top_k=5)
+        chunks = await self.rag.search(query, student.school_id, self.db, top_k=5)
 
         chunk_text = "\n\n".join(
             f"[Source: {c.get('page_url') or 'unknown'} | {c.get('section_heading') or ''}]\n{c['chunk_text']}"
@@ -441,7 +441,7 @@ class RiskEngine:
                 "citations": [],
             }
 
-    async def scan_student(self, student_id: uuid.UUID) -> list[dict[str, Any]]:
+    async def scan_student(self, student_id: uuid.UUID) -> list[RiskEvent]:
         """Evaluate all rules for one student and persist any new risk events."""
         from sqlalchemy.orm import selectinload
         result = await self.db.execute(
@@ -453,13 +453,10 @@ class RiskEngine:
         if student is None:
             return []
 
-        # Look up school-specific policy; fall back to federal defaults.
-        # Convert the school's display name to the slug used as the SCHOOL_POLICIES key.
-        # e.g. "UC Berkeley" → "berkeley", "Case Western Reserve University" → "case_western"
         school_name = student.school.name if student.school else None
         policy = SCHOOL_POLICIES.get(_school_slug(school_name), FEDERAL_DEFAULT_POLICY)
 
-        fired_events: list[dict[str, Any]] = []
+        fired_events: list[RiskEvent] = []
         rule_results = _evaluate_rules(student, policy)
 
         for rule in rule_results:
@@ -478,16 +475,11 @@ class RiskEngine:
                 action_packet_json=action_packet,
             )
             self.db.add(event)
-            fired_events.append(
-                {
-                    "risk_type": rule.risk_type,
-                    "severity": rule.severity.value,
-                    "context": rule.context,
-                    "action_packet": action_packet,
-                }
-            )
+            fired_events.append(event)
 
         await self.db.commit()
+        for event in fired_events:
+            await self.db.refresh(event)
         return fired_events
 
     async def scan_all(self) -> None:

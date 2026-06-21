@@ -29,9 +29,24 @@ _NOISE_TAGS = ["nav", "footer", "header", "script", "style", "noscript", "aside"
 
 class RAGService:
     def __init__(self) -> None:
-        self._openai = openai.AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
-        self._anthropic = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+        # Clients are created lazily so the server starts without API keys configured.
+        self._openai: openai.AsyncOpenAI | None = None
+        self._anthropic: anthropic.AsyncAnthropic | None = None
         self._enc = tiktoken.get_encoding("cl100k_base")
+
+    def _get_openai(self) -> openai.AsyncOpenAI:
+        if self._openai is None:
+            if not settings.OPENAI_API_KEY:
+                raise RuntimeError("OPENAI_API_KEY is not configured")
+            self._openai = openai.AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+        return self._openai
+
+    def _get_anthropic(self) -> anthropic.AsyncAnthropic:
+        if self._anthropic is None:
+            if not settings.ANTHROPIC_API_KEY:
+                raise RuntimeError("ANTHROPIC_API_KEY is not configured")
+            self._anthropic = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+        return self._anthropic
 
     # ── Ingestion ─────────────────────────────────────────────────────────────
 
@@ -147,7 +162,7 @@ class RAGService:
         return chunks
 
     async def _embed(self, texts: list[str]) -> list[list[float]]:
-        response = await self._openai.embeddings.create(
+        response = await self._get_openai().embeddings.create(
             model="text-embedding-3-small",
             input=texts,
         )
@@ -231,7 +246,7 @@ class RAGService:
         if not urls:
             return []
         url_list = "\n".join(urls[:50])
-        msg = await self._anthropic.messages.create(
+        msg = await self._get_anthropic().messages.create(
             model="claude-sonnet-4-6",
             max_tokens=200,
             system=(
@@ -272,21 +287,26 @@ class RAGService:
     async def search(
         self,
         query: str,
-        school_id: uuid.UUID,
+        school_id: uuid.UUID | None,
         session: AsyncSession,
         top_k: int = TOP_K,
     ) -> list[dict]:
         """Embed query, cosine search scoped to school_id, re-rank by recency."""
-        [q_emb] = await self._embed([query])
+        if school_id is None:
+            return []
 
-        distance_col = DocChunk.embedding.cosine_distance(q_emb)
-        stmt = (
-            select(DocChunk, distance_col.label("distance"))
-            .where(DocChunk.school_id == school_id)
-            .order_by(distance_col)
-            .limit(top_k * 3)
-        )
-        rows = (await session.execute(stmt)).all()
+        try:
+            [q_emb] = await self._embed([query])
+            distance_col = DocChunk.embedding.cosine_distance(q_emb)
+            stmt = (
+                select(DocChunk, distance_col.label("distance"))
+                .where(DocChunk.school_id == school_id)
+                .order_by(distance_col)
+                .limit(top_k * 3)
+            )
+            rows = (await session.execute(stmt)).all()
+        except Exception:
+            return []
 
         now = datetime.now(timezone.utc)
         ranked: list[dict] = []
@@ -418,7 +438,7 @@ class RAGService:
                 "All action fields except label are optional. Omit the block entirely for purely informational answers."
             )
 
-            msg = await self._anthropic.messages.create(
+            msg = await self._get_anthropic().messages.create(
                 model="claude-sonnet-4-6",
                 max_tokens=1500,
                 system=system,
@@ -579,7 +599,7 @@ class RAGService:
             )
 
             full_text = ""
-            async with self._anthropic.messages.stream(
+            async with self._get_anthropic().messages.stream(
                 model="claude-sonnet-4-6",
                 max_tokens=1500,
                 system=system,

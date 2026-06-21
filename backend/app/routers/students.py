@@ -13,7 +13,7 @@ from app.models.alert import Alert
 from app.models.risk_event import RiskEvent, Severity
 from app.models.school import School
 from app.models.student import Student
-from app.services.risk_engine import risk_engine
+from app.services.risk_engine import RiskEngine
 
 router = APIRouter(prefix="/students", tags=["students"])
 
@@ -217,4 +217,5 @@ async def scan_student(
     student_id: uuid.UUID, db: AsyncSession = Depends(get_db)
 ) -> list[RiskEvent]:
     """Manually trigger risk evaluation for one student."""
-    return await risk_engine.scan_student(student_id, db)
+    engine = RiskEngine(db)
+    return await engine.scan_student(student_id)
