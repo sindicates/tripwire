@@ -1,579 +1,660 @@
-"use client"
+'use client'
 
-import { useState, useEffect } from "react"
+import { useEffect } from 'react'
+import Link from 'next/link'
+import { AlertTriangle, FileText, ListChecks, LucideIcon } from 'lucide-react'
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
-
-export default function TestPage() {
-  // Config & State
-  const [token, setToken] = useState<string>("")
-  const [activeStudent, setActiveStudent] = useState<any>(null)
-  const [schools, setSchools] = useState<any[]>([])
-  const [logs, setLogs] = useState<string[]>([])
-
-  // Form Inputs
-  const [schoolForm, setSchoolForm] = useState({ name: "", ipeds_id: "", scorecard_id: "" })
-  const [registerForm, setRegisterForm] = useState({ email: "", password: "", school_id: "" })
-  const [loginForm, setLoginForm] = useState({ email: "", password: "" })
-  const [profileForm, setProfileForm] = useState({ gpa: "", credits_completed: "", credits_required: "", major: "" })
-  
-  // Data lists
-  const [riskEvents, setRiskEvents] = useState<any[]>([])
-  const [alerts, setAlerts] = useState<any[]>([])
-
-  // Log Helper
-  const addLog = (message: string, data?: any) => {
-    const timestamp = new Date().toLocaleTimeString()
-    const logText = `[${timestamp}] ${message}${data ? "\n" + JSON.stringify(data, null, 2) : ""}`
-    setLogs((prev) => [logText, ...prev])
-  }
-
-  // Load Initial Data
+export default function LandingPage() {
   useEffect(() => {
-    const savedToken = localStorage.getItem("test_token")
-    if (savedToken) {
-      setToken(savedToken)
-      addLog("Loaded token from localStorage")
-    }
-    fetchSchools()
+    const els = document.querySelectorAll('.reveal, .reveal-left, .reveal-scale')
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((e) => {
+          if (e.isIntersecting) {
+            e.target.classList.add('visible')
+            observer.unobserve(e.target)
+          }
+        })
+      },
+      { threshold: 0.12, root: null }
+    )
+    els.forEach((el) => observer.observe(el))
+    return () => observer.disconnect()
   }, [])
 
-  // Auto-fetch profile when token changes
-  useEffect(() => {
-    if (token) {
-      localStorage.setItem("test_token", token)
-      fetchProfile()
-    } else {
-      localStorage.removeItem("test_token")
-      setActiveStudent(null)
-      setRiskEvents([])
-      setAlerts([])
-    }
-  }, [token])
-
-  // Fetch lists when active student changes
-  useEffect(() => {
-    if (activeStudent) {
-      fetchRiskEvents()
-      fetchAlerts()
-    }
-  }, [activeStudent])
-
-  // --- API CALLS ---
-
-  const fetchSchools = async () => {
-    try {
-      const res = await fetch(`${API_BASE}/api/v1/schools/`)
-      if (!res.ok) throw new Error(await res.text())
-      const data = await res.json()
-      setSchools(data)
-      addLog("Fetched schools list", data)
-    } catch (err: any) {
-      addLog("Failed to fetch schools", err.message)
-    }
-  }
-
-  const createSchool = async (e: React.FormEvent) => {
-    e.preventDefault()
-    try {
-      const res = await fetch(`${API_BASE}/api/v1/schools/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(schoolForm),
-      })
-      if (!res.ok) throw new Error(await res.text())
-      const data = await res.json()
-      addLog("Created school", data)
-      fetchSchools()
-      setSchoolForm({ name: "", ipeds_id: "", scorecard_id: "" })
-    } catch (err: any) {
-      addLog("Failed to create school", err.message)
-    }
-  }
-
-  const registerStudent = async (e: React.FormEvent) => {
-    e.preventDefault()
-    try {
-      const res = await fetch(`${API_BASE}/api/v1/auth/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(registerForm),
-      })
-      if (!res.ok) throw new Error(await res.text())
-      const data = await res.json()
-      addLog("Student registered successfully", data)
-      if (data.access_token) {
-        setToken(data.access_token)
-      }
-    } catch (err: any) {
-      addLog("Registration failed", err.message)
-    }
-  }
-
-  const loginStudent = async (e: React.FormEvent) => {
-    e.preventDefault()
-    try {
-      const body = new URLSearchParams()
-      body.append("username", loginForm.email)
-      body.append("password", loginForm.password)
-
-      const res = await fetch(`${API_BASE}/api/v1/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: body.toString(),
-      })
-      if (!res.ok) throw new Error(await res.text())
-      const data = await res.json()
-      addLog("Logged in successfully", data)
-      if (data.access_token) {
-        setToken(data.access_token)
-      }
-    } catch (err: any) {
-      addLog("Login failed", err.message)
-    }
-  }
-
-  const fetchProfile = async () => {
-    try {
-      const res = await fetch(`${API_BASE}/api/v1/students/me`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (!res.ok) {
-        setToken("") // clear bad token
-        throw new Error(await res.text())
-      }
-      const data = await res.json()
-      setActiveStudent(data)
-      setProfileForm({
-        gpa: data.gpa?.toString() || "",
-        credits_completed: data.credits_completed?.toString() || "",
-        credits_required: data.credits_required?.toString() || "",
-        major: data.major || "",
-      })
-      addLog("Fetched active student profile", data)
-    } catch (err: any) {
-      addLog("Failed to fetch student profile", err.message)
-    }
-  }
-
-  const updateProfile = async (e: React.FormEvent) => {
-    e.preventDefault()
-    try {
-      const payload = {
-        gpa: profileForm.gpa ? parseFloat(profileForm.gpa) : null,
-        credits_completed: profileForm.credits_completed ? parseInt(profileForm.credits_completed) : null,
-        credits_required: profileForm.credits_required ? parseInt(profileForm.credits_required) : null,
-        major: profileForm.major || null,
-      }
-      const res = await fetch(`${API_BASE}/api/v1/students/me`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      })
-      if (!res.ok) throw new Error(await res.text())
-      const data = await res.json()
-      addLog("Updated student profile", data)
-      setActiveStudent(data)
-    } catch (err: any) {
-      addLog("Failed to update profile", err.message)
-    }
-  }
-
-  const triggerScan = async () => {
-    if (!activeStudent) return
-    try {
-      addLog(`Triggering risk evaluation scan for student: ${activeStudent.id}...`)
-      const res = await fetch(`${API_BASE}/api/v1/students/${activeStudent.id}/scan`, {
-        method: "POST",
-      })
-      if (!res.ok) throw new Error(await res.text())
-      const data = await res.json()
-      addLog("Evaluation scan complete. Resulting risk events generated:", data)
-      fetchRiskEvents()
-      fetchAlerts()
-    } catch (err: any) {
-      addLog("Scan failed", err.message)
-    }
-  }
-
-  const fetchRiskEvents = async () => {
-    if (!activeStudent) return
-    try {
-      const res = await fetch(`${API_BASE}/api/v1/students/${activeStudent.id}/risk-events`)
-      if (!res.ok) throw new Error(await res.text())
-      const data = await res.json()
-      setRiskEvents(data)
-      addLog("Fetched active student risk events", data)
-    } catch (err: any) {
-      addLog("Failed to fetch risk events", err.message)
-    }
-  }
-
-  const resolveEvent = async (eventId: string) => {
-    try {
-      const res = await fetch(`${API_BASE}/api/v1/risk-events/${eventId}/resolve`, {
-        method: "PUT",
-      })
-      if (!res.ok) throw new Error(await res.text())
-      const data = await res.json()
-      addLog("Resolved risk event", data)
-      fetchRiskEvents()
-    } catch (err: any) {
-      addLog("Failed to resolve event", err.message)
-    }
-  }
-
-  const fetchAlerts = async () => {
-    if (!activeStudent) return
-    try {
-      const res = await fetch(`${API_BASE}/api/v1/students/${activeStudent.id}/alerts`)
-      if (!res.ok) throw new Error(await res.text())
-      const data = await res.json()
-      setAlerts(data)
-      addLog("Fetched active student alerts", data)
-    } catch (err: any) {
-      addLog("Failed to fetch alerts", err.message)
-    }
-  }
-
-  const openAlert = async (alertId: string) => {
-    try {
-      const res = await fetch(`${API_BASE}/api/v1/alerts/${alertId}/open`, {
-        method: "PUT",
-      })
-      if (!res.ok) throw new Error(await res.text())
-      const data = await res.json()
-      addLog("Opened alert", data)
-      fetchAlerts()
-    } catch (err: any) {
-      addLog("Failed to open alert", err.message)
-    }
-  }
-
   return (
-    <div className="p-6 font-mono text-xs bg-slate-900 text-slate-200 min-h-screen">
-      <header className="border-b border-slate-700 pb-4 mb-6">
-        <h1 className="text-xl font-bold text-emerald-400">Tripwire API Debug Consol</h1>
-        <p className="text-slate-400">Environment: {API_BASE}</p>
-        {token ? (
-          <div className="mt-2 flex items-center gap-4 bg-slate-800 p-2 rounded">
-            <span>JWT Active: <span className="text-amber-400 font-semibold">{token.substring(0, 15)}...</span></span>
-            <button 
-              onClick={() => setToken("")} 
-              className="px-2 py-0.5 bg-red-800 hover:bg-red-700 rounded text-[10px]"
+    <>
+      {/* ── NAVBAR ── */}
+      <nav style={{
+        background: '#0d5c2e',
+        height: '54px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '0 36px',
+        position: 'sticky',
+        top: 0,
+        zIndex: 50,
+      }}>
+        <Link href="/" style={{ textDecoration: 'none' }}>
+          <span className="nav-brand">Tripwire</span>
+        </Link>
+
+        <div style={{ display: 'flex', gap: '28px' }}>
+          {(['How it works', 'Risk types', 'About'] as const).map((link) => (
+            <a
+              key={link}
+              href="#"
+              style={{
+                fontFamily: 'Satoshi, sans-serif',
+                fontWeight: 400,
+                fontSize: '14px',
+                color: 'rgba(255,255,255,0.6)',
+                textDecoration: 'none',
+                transition: 'color 0.15s',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = '#fff')}
+              onMouseLeave={(e) => (e.currentTarget.style.color = 'rgba(255,255,255,0.6)')}
+            >{link}</a>
+          ))}
+        </div>
+
+        <button
+          onClick={() => console.log('TODO: navigate-to-signin')}
+          style={{
+            background: 'transparent',
+            border: '1.5px solid rgba(255,255,255,0.4)',
+            borderRadius: '4px',
+            color: '#fff',
+            fontFamily: 'Satoshi, sans-serif',
+            fontWeight: 500,
+            fontSize: '13px',
+            padding: '7px 16px',
+            cursor: 'pointer',
+            transition: 'border-color 0.15s, background 0.15s',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.8)'
+            e.currentTarget.style.background = 'rgba(255,255,255,0.08)'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.4)'
+            e.currentTarget.style.background = 'transparent'
+          }}
+        >Sign in</button>
+      </nav>
+
+      {/* ── HERO ── */}
+      <section style={{ height: '100vh', position: 'relative', overflow: 'hidden' }}>
+        {/* Base gradient */}
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          background: 'linear-gradient(180deg, #0d5c2e 0%, #13733a 22%, #1a8545 38%, rgba(22,105,56,0.4) 58%, rgba(249,250,251,0.88) 80%, #f9fafb 100%)',
+        }} />
+
+        {/* SVG data visualization */}
+        <svg
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
+          viewBox="0 0 1200 490"
+          preserveAspectRatio="xMidYMid slice"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <ellipse cx="200" cy="480" rx="280" ry="50" fill="#0a4020" opacity="0.5" />
+          <ellipse cx="700" cy="490" rx="400" ry="60" fill="#083518" opacity="0.4" />
+          <ellipse cx="1100" cy="475" rx="220" ry="40" fill="#0d5c2e" opacity="0.35" />
+
+          <polyline
+            points="80,430 350,300 600,190 850,110 1100,55"
+            fill="none"
+            stroke="#f9a8d4"
+            strokeWidth="1.5"
+            strokeDasharray="6,5"
+            opacity="0.7"
+          />
+
+          <circle cx="350" cy="300" r="5" fill="#f9a8d4" opacity="0.9" />
+
+          <circle cx="600" cy="190" r="22" fill="none" stroke="#f9a8d4" strokeWidth="0.8" opacity="0.2" />
+          <circle cx="600" cy="190" r="13" fill="none" stroke="#f9a8d4" strokeWidth="1" opacity="0.4" />
+          <circle cx="600" cy="190" r="5" fill="#f9a8d4" opacity="0.9" />
+
+          <circle cx="850" cy="110" r="5" fill="#f9a8d4" opacity="0.9" />
+
+          <g transform="translate(110, 72)">
+            <rect width="164" height="102" rx="3" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.2)" strokeWidth="1" />
+            <rect x="10" y="12" width="52" height="8" rx="2" fill="#f9a8d4" opacity="0.7" />
+            <rect x="10" y="30" width="124" height="5" rx="1.5" fill="rgba(255,255,255,0.18)" />
+            <rect x="10" y="42" width="94" height="5" rx="1.5" fill="rgba(255,255,255,0.12)" />
+            <rect x="10" y="54" width="108" height="5" rx="1.5" fill="rgba(255,255,255,0.12)" />
+            <rect x="10" y="74" width="50" height="16" rx="2" fill="#f9a8d4" opacity="0.6" />
+          </g>
+
+          <g transform="translate(878, 195)">
+            <rect width="158" height="96" rx="3" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.2)" strokeWidth="1" />
+            <rect x="10" y="12" width="62" height="8" rx="2" fill="#f9a8d4" opacity="0.65" />
+            <rect x="10" y="30" width="118" height="5" rx="1.5" fill="rgba(255,255,255,0.18)" />
+            <rect x="10" y="42" width="88" height="5" rx="1.5" fill="rgba(255,255,255,0.12)" />
+            <rect x="10" y="54" width="102" height="5" rx="1.5" fill="rgba(255,255,255,0.12)" />
+            <rect x="10" y="70" width="46" height="15" rx="2" fill="#f9a8d4" opacity="0.6" />
+          </g>
+        </svg>
+
+        {/* Fade-to-body overlay */}
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          background: 'linear-gradient(180deg, transparent 40%, rgba(249,250,251,0.7) 72%, #f9fafb 100%)',
+        }} />
+
+        {/* Hero content — CSS fadeUp keyframe, fires on load */}
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          textAlign: 'center',
+          paddingTop: '14vh',
+          paddingLeft: '24px',
+          paddingRight: '24px',
+        }}>
+          <p style={{
+            fontFamily: 'Satoshi, sans-serif',
+            fontWeight: 500,
+            fontSize: '12px',
+            textTransform: 'uppercase',
+            letterSpacing: '1.1px',
+            color: 'rgba(255,255,255,0.55)',
+            margin: '0 0 20px',
+            animation: 'fadeUp 0.6s cubic-bezier(0.22,1,0.36,1) 0.10s both',
+          }}>
+            Academic risk intelligence
+          </p>
+
+          <h1 style={{
+            fontFamily: 'Merriweather, serif',
+            fontWeight: 900,
+            fontSize: '56px',
+            color: '#fff',
+            lineHeight: 1.12,
+            margin: '0 0 22px',
+            animation: 'fadeUp 0.65s cubic-bezier(0.22,1,0.36,1) 0.20s both',
+          }}>
+            Know before<br />
+            it <em style={{ color: '#86efac', fontStyle: 'italic' }}>costs you.</em>
+          </h1>
+
+          <p style={{
+            fontFamily: 'Satoshi, sans-serif',
+            fontWeight: 400,
+            fontSize: '16px',
+            color: 'rgba(255,255,255,0.78)',
+            maxWidth: '430px',
+            lineHeight: 1.65,
+            margin: '0 0 30px',
+            animation: 'fadeUp 0.65s cubic-bezier(0.22,1,0.36,1) 0.32s both',
+          }}>
+            Tripwire monitors your GPA, aid standing, and graduation pace — and tells you exactly what to do before the deadline passes.
+          </p>
+
+          <div style={{ display: 'flex', gap: '9px', animation: 'fadeUp 0.65s cubic-bezier(0.22,1,0.36,1) 0.42s both' }}>
+            <button
+              onClick={() => console.log('TODO: navigate-to-signup')}
+              style={{
+                background: '#f9a8d4',
+                color: '#fff',
+                fontFamily: 'Satoshi, sans-serif',
+                fontWeight: 700,
+                fontSize: '13px',
+                borderRadius: '4px',
+                padding: '10px 20px',
+                border: 'none',
+                cursor: 'pointer',
+                transition: 'background 0.15s, transform 0.1s',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = '#e8619f')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = '#f9a8d4')}
+              onMouseDown={(e) => (e.currentTarget.style.transform = 'scale(0.97)')}
+              onMouseUp={(e) => (e.currentTarget.style.transform = 'scale(1)')}
             >
-              LOGOUT / CLEAR TOKEN
+              Connect your school
+            </button>
+
+            <button
+              onClick={() => console.log('TODO: scroll-to-how-it-works')}
+              style={{
+                background: 'rgba(255,255,255,0.9)',
+                border: '1.5px solid #111827',
+                color: '#111827',
+                fontFamily: 'Satoshi, sans-serif',
+                fontWeight: 600,
+                fontSize: '13px',
+                borderRadius: '4px',
+                padding: '9px 17px',
+                cursor: 'pointer',
+                transition: 'background 0.15s, border-color 0.15s',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#fff'
+                e.currentTarget.style.borderColor = '#000'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'rgba(255,255,255,0.9)'
+                e.currentTarget.style.borderColor = '#111827'
+              }}
+            >
+              See how it works
             </button>
           </div>
-        ) : (
-          <div className="mt-2 text-rose-400 bg-rose-950/30 p-2 rounded">
-            No active student session. Please login or register.
-          </div>
-        )}
-      </header>
+        </div>
+      </section>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* LEFT COLUMN: SETUP & AUTH */}
-        <div className="space-y-6">
-          {/* Schools */}
-          <div className="border border-slate-700 rounded p-4 bg-slate-950">
-            <h2 className="text-sm font-bold text-blue-400 mb-3 border-b border-slate-800 pb-1">1. Schools Manager</h2>
-            <form onSubmit={createSchool} className="space-y-2 mb-4">
-              <input
-                type="text"
-                placeholder="School Name"
-                value={schoolForm.name}
-                onChange={(e) => setSchoolForm({ ...schoolForm, name: e.target.value })}
-                required
-                className="w-full bg-slate-800 border border-slate-700 p-1.5 rounded"
-              />
-              <input
-                type="text"
-                placeholder="IPEDS ID (optional)"
-                value={schoolForm.ipeds_id}
-                onChange={(e) => setSchoolForm({ ...schoolForm, ipeds_id: e.target.value })}
-                className="w-full bg-slate-800 border border-slate-700 p-1.5 rounded"
-              />
-              <input
-                type="text"
-                placeholder="Scorecard ID (optional)"
-                value={schoolForm.scorecard_id}
-                onChange={(e) => setSchoolForm({ ...schoolForm, scorecard_id: e.target.value })}
-                className="w-full bg-slate-800 border border-slate-700 p-1.5 rounded"
-              />
-              <button type="submit" className="w-full bg-blue-700 hover:bg-blue-600 p-1.5 font-bold rounded">
-                + Create School
-              </button>
-            </form>
-            <div>
-              <p className="font-bold text-slate-400 mb-1">Existing Schools ({schools.length}):</p>
-              <div className="max-h-32 overflow-y-auto space-y-1 bg-slate-900 p-1 border border-slate-800 rounded">
-                {schools.map((s) => (
-                  <div key={s.id} className="p-1 hover:bg-slate-800 rounded flex justify-between border-b border-slate-800">
-                    <span className="text-slate-300 font-semibold">{s.name}</span>
-                    <span className="text-slate-500 font-mono text-[9px]">{s.id.substring(0, 8)}</span>
-                  </div>
-                ))}
+      {/* ── WHY TRIPWIRE ── */}
+      <section style={{ background: '#f9fafb', padding: '52px 36px' }}>
+        <div style={{ maxWidth: '840px', margin: '0 auto' }}>
+
+          <p className="reveal" style={{
+            fontFamily: 'Merriweather, serif',
+            fontWeight: 400,
+            fontStyle: 'italic',
+            fontSize: '11px',
+            color: '#f9a8d4',
+            margin: '0 0 12px',
+            textTransform: 'uppercase',
+            letterSpacing: '0.6px',
+          }}>
+            Why Tripwire
+          </p>
+
+          <h2 className="reveal stagger-1" style={{
+            fontFamily: 'Merriweather, serif',
+            fontWeight: 700,
+            fontSize: '22px',
+            color: '#0d5c2e',
+            maxWidth: '500px',
+            lineHeight: 1.28,
+            margin: '0 0 20px',
+          }}>
+            Most students don&apos;t lose aid because they stopped trying.
+          </h2>
+
+          <p className="reveal stagger-2" style={{
+            fontFamily: 'Satoshi, sans-serif',
+            fontWeight: 400,
+            fontSize: '14px',
+            color: '#6b7280',
+            maxWidth: '560px',
+            lineHeight: 1.75,
+            margin: '0 0 32px',
+          }}>
+            They lose it because nobody told them the deadline was two weeks away, or the credit math wasn&apos;t adding up. Advising offices are overbooked, school portals bury the information, and no one is watching your trajectory in real time. Tripwire does.
+          </p>
+
+          {/* Quote block */}
+          <blockquote className="reveal stagger-2" style={{
+            background: '#f0fdf4',
+            borderLeft: '3px solid #0d5c2e',
+            borderRadius: '0 4px 4px 0',
+            padding: '18px 20px',
+            margin: '0 0 32px',
+          }}>
+            <p style={{
+              fontFamily: 'Merriweather, serif',
+              fontWeight: 400,
+              fontStyle: 'italic',
+              fontSize: '14px',
+              color: '#0d5c2e',
+              lineHeight: 1.7,
+              margin: '0 0 10px',
+            }}>
+              &ldquo;I didn&apos;t know my SAP status had slipped until my aid was already paused. By then it was too late to appeal for that semester.&rdquo;
+            </p>
+            <p style={{
+              fontFamily: 'Satoshi, sans-serif',
+              fontWeight: 400,
+              fontSize: '11.5px',
+              color: '#6b7280',
+              margin: 0,
+            }}>
+              — First-gen student, community college, 2024
+            </p>
+          </blockquote>
+
+          {/* Feature cards */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, 1fr)',
+            gap: '10px',
+            marginBottom: '32px',
+          }}>
+            <FeatureCard
+              iconBg="#dcfce7"
+              iconColor="#15803d"
+              Icon={AlertTriangle}
+              title="Risk detection before it's too late"
+              desc="GPA drops, SAP failures, FAFSA windows — flagged weeks ahead with clear urgency levels."
+              delayClass="stagger-1"
+            />
+            <FeatureCard
+              iconBg="#fce7f3"
+              iconColor="#be185d"
+              Icon={FileText}
+              title="Grounded in your school's actual rules"
+              desc="Every alert cites official financial aid and registrar documents. No guessing."
+              delayClass="stagger-2"
+            />
+            <FeatureCard
+              iconBg="#f0fdf4"
+              iconColor="#0d5c2e"
+              Icon={ListChecks}
+              title="Exact next steps, not vague suggestions"
+              desc='Each risk comes with the specific form, deadline, and office — not "contact your advisor."'
+              delayClass="stagger-3"
+            />
+          </div>
+
+          {/* Stats strip */}
+          <div className="reveal-scale" style={{
+            background: '#0d5c2e',
+            borderRadius: '4px',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, 1fr)',
+          }}>
+            {[
+              { num: '$3.7B', label: 'in Pell Grant aid goes unclaimed each year', border: true },
+              { num: '40%', label: "of first-gen students don't finish their degree", border: true },
+              { num: '1 in 4', label: 'students lose aid for missing a single deadline', border: false },
+            ].map(({ num, label, border }) => (
+              <div key={num} style={{
+                padding: '20px 22px',
+                textAlign: 'center',
+                borderRight: border ? '1px solid rgba(255,255,255,0.09)' : 'none',
+              }}>
+                <p style={{
+                  fontFamily: 'Merriweather, serif',
+                  fontWeight: 900,
+                  fontSize: '26px',
+                  color: '#f9a8d4',
+                  margin: '0 0 4px',
+                }}>{num}</p>
+                <p style={{
+                  fontFamily: 'Satoshi, sans-serif',
+                  fontWeight: 400,
+                  fontSize: '11.5px',
+                  color: 'rgba(255,255,255,0.45)',
+                  lineHeight: 1.5,
+                  margin: 0,
+                }}>{label}</p>
               </div>
-            </div>
-          </div>
-
-          {/* Auth Registration */}
-          <div className="border border-slate-700 rounded p-4 bg-slate-950">
-            <h2 className="text-sm font-bold text-blue-400 mb-3 border-b border-slate-800 pb-1">2. Register Student</h2>
-            <form onSubmit={registerStudent} className="space-y-2">
-              <input
-                type="email"
-                placeholder="Email Address"
-                value={registerForm.email}
-                onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })}
-                required
-                className="w-full bg-slate-800 border border-slate-700 p-1.5 rounded"
-              />
-              <input
-                type="password"
-                placeholder="Password"
-                value={registerForm.password}
-                onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })}
-                required
-                className="w-full bg-slate-800 border border-slate-700 p-1.5 rounded"
-              />
-              <select
-                value={registerForm.school_id}
-                onChange={(e) => setRegisterForm({ ...registerForm, school_id: e.target.value })}
-                required
-                className="w-full bg-slate-800 border border-slate-700 p-1.5 rounded"
-              >
-                <option value="">-- Select School --</option>
-                {schools.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name} ({s.id.substring(0, 8)})</option>
-                ))}
-              </select>
-              <button type="submit" className="w-full bg-blue-700 hover:bg-blue-600 p-1.5 font-bold rounded">
-                Register Student
-              </button>
-            </form>
-          </div>
-
-          {/* Auth Login */}
-          <div className="border border-slate-700 rounded p-4 bg-slate-950">
-            <h2 className="text-sm font-bold text-blue-400 mb-3 border-b border-slate-800 pb-1">3. Student Login</h2>
-            <form onSubmit={loginStudent} className="space-y-2">
-              <input
-                type="email"
-                placeholder="Email Address"
-                value={loginForm.email}
-                onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
-                required
-                className="w-full bg-slate-800 border border-slate-700 p-1.5 rounded"
-              />
-              <input
-                type="password"
-                placeholder="Password"
-                value={loginForm.password}
-                onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
-                required
-                className="w-full bg-slate-800 border border-slate-700 p-1.5 rounded"
-              />
-              <button type="submit" className="w-full bg-emerald-700 hover:bg-emerald-600 p-1.5 font-bold rounded">
-                Login
-              </button>
-            </form>
+            ))}
           </div>
         </div>
+      </section>
 
-        {/* CENTER COLUMN: ACTIVE STUDENT PROFILE & SCANS */}
-        <div className="space-y-6">
-          <div className="border border-slate-700 rounded p-4 bg-slate-950">
-            <h2 className="text-sm font-bold text-amber-400 mb-3 border-b border-slate-800 pb-1">4. Student Profile</h2>
-            {activeStudent ? (
-              <div className="space-y-4">
-                <div className="bg-slate-900 p-2 rounded space-y-1">
-                  <p><span className="text-slate-500">ID:</span> <span className="text-slate-300 font-mono text-[10px]">{activeStudent.id}</span></p>
-                  <p><span className="text-slate-500">Email:</span> <span className="text-slate-300 font-semibold">{activeStudent.email}</span></p>
-                  <p><span className="text-slate-500">School ID:</span> <span className="text-slate-300 font-mono text-[10px]">{activeStudent.school_id}</span></p>
+      {/* ── HOW IT WORKS ── */}
+      <section id="how-it-works" style={{
+        background: '#fff',
+        padding: '52px 36px',
+        borderTop: '1px solid #e5e7eb',
+      }}>
+        <div style={{ maxWidth: '840px', margin: '0 auto' }}>
+
+          <p className="reveal" style={{
+            fontFamily: 'Merriweather, serif',
+            fontWeight: 400,
+            fontStyle: 'italic',
+            fontSize: '11px',
+            color: '#f9a8d4',
+            margin: '0 0 12px',
+            textTransform: 'uppercase',
+            letterSpacing: '0.6px',
+          }}>
+            How it works
+          </p>
+
+          <h2 className="reveal stagger-1" style={{
+            fontFamily: 'Merriweather, serif',
+            fontWeight: 700,
+            fontSize: '22px',
+            color: '#0d5c2e',
+            lineHeight: 1.28,
+            margin: '0 0 32px',
+          }}>
+            Set up in minutes. Monitors you all semester.
+          </h2>
+
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            {[
+              {
+                n: '1',
+                title: 'Connect your school',
+                desc: 'Search 6,000+ institutions. Tripwire ingests your financial aid, registrar, and advising documents.',
+                delay: 'stagger-1',
+                last: false,
+              },
+              {
+                n: '2',
+                title: 'Enter your academic profile',
+                desc: 'GPA, credits, aid package, and graduation target. Upload your degree audit for full trajectory analysis.',
+                delay: 'stagger-2',
+                last: false,
+              },
+              {
+                n: '3',
+                title: 'Get alerts before risks become problems',
+                desc: 'Nightly scans surface risks with exact action steps — the form, the deadline, the office.',
+                delay: 'stagger-3',
+                last: false,
+              },
+              {
+                n: '4',
+                title: 'Ask your policy advisor anything',
+                desc: '"Can I drop this class without losing aid?" Answers grounded in your school\'s actual rules.',
+                delay: 'stagger-4',
+                last: true,
+              },
+            ].map(({ n, title, desc, delay, last }) => (
+              <div key={n} className={`reveal-left ${delay}`} style={{
+                display: 'flex',
+                gap: '16px',
+                padding: '16px 0',
+                borderBottom: last ? 'none' : '1px solid #f3f4f6',
+                alignItems: 'flex-start',
+              }}>
+                <div style={{
+                  width: '24px',
+                  height: '24px',
+                  borderRadius: '3px',
+                  background: '#0d5c2e',
+                  color: '#fff',
+                  fontFamily: 'Merriweather, serif',
+                  fontWeight: 700,
+                  fontSize: '10.5px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  marginTop: '1px',
+                }}>{n}</div>
+                <div>
+                  <p style={{
+                    fontFamily: 'Merriweather, serif',
+                    fontWeight: 700,
+                    fontSize: '12.5px',
+                    color: '#111827',
+                    margin: '0 0 4px',
+                  }}>{title}</p>
+                  <p style={{
+                    fontFamily: 'Satoshi, sans-serif',
+                    fontWeight: 400,
+                    fontSize: '12.5px',
+                    color: '#9ca3af',
+                    lineHeight: 1.6,
+                    margin: 0,
+                  }}>{desc}</p>
                 </div>
-
-                <form onSubmit={updateProfile} className="space-y-2 border-t border-slate-800 pt-3">
-                  <p className="font-bold text-slate-400">Update Risk Variables:</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="text-[10px] text-slate-500 block">GPA</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        placeholder="e.g. 2.5"
-                        value={profileForm.gpa}
-                        onChange={(e) => setProfileForm({ ...profileForm, gpa: e.target.value })}
-                        className="w-full bg-slate-800 border border-slate-700 p-1.5 rounded"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-slate-500 block">Major</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. History"
-                        value={profileForm.major}
-                        onChange={(e) => setProfileForm({ ...profileForm, major: e.target.value })}
-                        className="w-full bg-slate-800 border border-slate-700 p-1.5 rounded"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-slate-500 block">Completed Credits</label>
-                      <input
-                        type="number"
-                        placeholder="e.g. 45"
-                        value={profileForm.credits_completed}
-                        onChange={(e) => setProfileForm({ ...profileForm, credits_completed: e.target.value })}
-                        className="w-full bg-slate-800 border border-slate-700 p-1.5 rounded"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-slate-500 block">Required Credits</label>
-                      <input
-                        type="number"
-                        placeholder="e.g. 120"
-                        value={profileForm.credits_required}
-                        onChange={(e) => setProfileForm({ ...profileForm, credits_required: e.target.value })}
-                        className="w-full bg-slate-800 border border-slate-700 p-1.5 rounded"
-                      />
-                    </div>
-                  </div>
-                  <button type="submit" className="w-full bg-amber-700 hover:bg-amber-600 p-1.5 font-bold rounded">
-                    Save Variables
-                  </button>
-                </form>
-
-                <div className="border-t border-slate-800 pt-3">
-                  <p className="font-bold text-slate-400 mb-2">5. Trigger Actions:</p>
-                  <button 
-                    onClick={triggerScan}
-                    className="w-full bg-violet-700 hover:bg-violet-600 p-2 font-bold rounded text-white flex items-center justify-center gap-2"
-                  >
-                    ⚡ TRIGGER RISK ENGINE SCAN
-                  </button>
-                  <p className="text-[9px] text-slate-500 mt-1">Evaluates rules: gpa_drop, credit_deficit, etc. and fires risk events.</p>
-                </div>
               </div>
-            ) : (
-              <p className="text-slate-500">Log in or Register above to view student variables.</p>
-            )}
-          </div>
-
-          {/* Alerts Feed */}
-          <div className="border border-slate-700 rounded p-4 bg-slate-950">
-            <h2 className="text-sm font-bold text-purple-400 mb-3 border-b border-slate-800 pb-1">6. Recent Alerts ({alerts.length})</h2>
-            {activeStudent ? (
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {alerts.length === 0 ? (
-                  <p className="text-slate-500">No alerts dispatched.</p>
-                ) : (
-                  alerts.map((a) => (
-                    <div key={a.id} className="p-2 bg-slate-900 border border-slate-800 rounded space-y-1">
-                      <div className="flex justify-between font-bold">
-                        <span className="text-violet-400">CHANNEL: {a.channel}</span>
-                        <span className="text-slate-500 font-mono text-[9px]">{a.id.substring(0, 8)}</span>
-                      </div>
-                      <p><span className="text-slate-500">Sent:</span> {new Date(a.sent_at).toLocaleTimeString()}</p>
-                      <p><span className="text-slate-500">Opened:</span> {a.opened_at ? <span className="text-emerald-400">{new Date(a.opened_at).toLocaleTimeString()}</span> : <span className="text-amber-500 font-semibold">UNOPENED</span>}</p>
-                      {!a.opened_at && (
-                        <button 
-                          onClick={() => openAlert(a.id)}
-                          className="mt-1 w-full bg-slate-800 hover:bg-slate-700 py-0.5 rounded text-[10px] text-slate-300"
-                        >
-                          Mark Opened
-                        </button>
-                      )}
-                    </div>
-                  ))
-                )}
-              </div>
-            ) : (
-              <p className="text-slate-500">Select student to view alerts.</p>
-            )}
+            ))}
           </div>
         </div>
+      </section>
 
-        {/* RIGHT COLUMN: RISK EVENTS FEED */}
-        <div className="space-y-6">
-          <div className="border border-slate-700 rounded p-4 bg-slate-950 min-h-[300px]">
-            <h2 className="text-sm font-bold text-rose-400 mb-3 border-b border-slate-800 pb-1">7. Active Risk Events ({riskEvents.length})</h2>
-            {activeStudent ? (
-              <div className="space-y-3 max-h-[500px] overflow-y-auto">
-                {riskEvents.length === 0 ? (
-                  <p className="text-slate-500">No risk events found. Try dropping GPA or credit pace and triggering a scan!</p>
-                ) : (
-                  riskEvents.map((ev) => (
-                    <div key={ev.id} className={`p-3 rounded border space-y-1 bg-slate-900 ${
-                      ev.severity === 'urgent' ? 'border-red-800' : ev.severity === 'warn' ? 'border-amber-800' : 'border-blue-800'
-                    }`}>
-                      <div className="flex justify-between items-start">
-                        <span className={`px-1 rounded text-[9px] font-bold ${
-                          ev.severity === 'urgent' ? 'bg-red-950 text-red-400' : ev.severity === 'warn' ? 'bg-amber-950 text-amber-400' : 'bg-blue-950 text-blue-400'
-                        }`}>
-                          {ev.severity.toUpperCase()}
-                        </span>
-                        <span className="text-slate-500 font-mono text-[9px]">{ev.id.substring(0, 8)}</span>
-                      </div>
-                      <p><span className="text-slate-400 font-bold">{ev.risk_type}</span></p>
-                      <p className="text-slate-400 text-[10px]">{new Date(ev.predicted_at).toLocaleString()}</p>
-                      
-                      {ev.context_json && (
-                        <div className="mt-1">
-                          <p className="text-slate-500 text-[9px] font-bold">Context Evidence:</p>
-                          <pre className="text-[9px] bg-slate-950 p-1 rounded overflow-x-auto text-slate-400">
-                            {JSON.stringify(ev.context_json, null, 2)}
-                          </pre>
-                        </div>
-                      )}
+      {/* ── CTA ── */}
+      <section style={{
+        background: '#0d5c2e',
+        padding: '52px 36px',
+        textAlign: 'center',
+      }}>
+        <h2 className="reveal" style={{
+          fontFamily: 'Merriweather, serif',
+          fontWeight: 900,
+          fontSize: '24px',
+          color: '#fff',
+          lineHeight: 1.2,
+          margin: '0 0 14px',
+        }}>
+          Don&apos;t find out you lost aid<br />
+          after the <em style={{ color: '#86efac', fontStyle: 'italic' }}>semester ends.</em>
+        </h2>
 
-                      {ev.resolved_at ? (
-                        <p className="text-emerald-400 font-bold text-[10px] mt-2">✓ Resolved at {new Date(ev.resolved_at).toLocaleTimeString()}</p>
-                      ) : (
-                        <button 
-                          onClick={() => resolveEvent(ev.id)}
-                          className="mt-2 w-full bg-rose-950 hover:bg-rose-900 text-rose-300 py-1 rounded text-[10px] font-semibold border border-rose-800"
-                        >
-                          Mark Resolved (Close Loop)
-                        </button>
-                      )}
-                    </div>
-                  ))
-                )}
-              </div>
-            ) : (
-              <p className="text-slate-500">Select student to view risk events.</p>
-            )}
-          </div>
-        </div>
-      </div>
+        <p className="reveal stagger-1" style={{
+          fontFamily: 'Satoshi, sans-serif',
+          fontWeight: 400,
+          fontSize: '14px',
+          color: 'rgba(255,255,255,0.55)',
+          margin: '0 0 26px',
+        }}>
+          Two minutes to set up. Monitors your standing all semester long.
+        </p>
 
-      {/* LOWER LOGGER PANEL */}
-      <footer className="mt-8 border-t border-slate-800 pt-4">
-        <div className="flex justify-between items-center mb-2">
-          <p className="font-bold text-slate-400 text-sm">HTTP Transaction & Output Logs</p>
-          <button 
-            onClick={() => setLogs([])} 
-            className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded text-[10px]"
+        <div className="reveal stagger-2">
+          <button
+            onClick={() => console.log('TODO: navigate-to-signup')}
+            style={{
+              background: '#f9a8d4',
+              color: '#fff',
+              fontFamily: 'Satoshi, sans-serif',
+              fontWeight: 700,
+              fontSize: '13px',
+              borderRadius: '4px',
+              padding: '10px 22px',
+              border: 'none',
+              cursor: 'pointer',
+              transition: 'background 0.15s, transform 0.1s',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = '#e8619f')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = '#f9a8d4')}
+            onMouseDown={(e) => (e.currentTarget.style.transform = 'scale(0.97)')}
+            onMouseUp={(e) => (e.currentTarget.style.transform = 'scale(1)')}
           >
-            Clear Console
+            Connect your school — it&apos;s free
           </button>
         </div>
-        <div className="bg-slate-950 p-4 rounded border border-slate-800 max-h-72 overflow-y-auto space-y-2">
-          {logs.length === 0 ? (
-            <p className="text-slate-600">Console empty. Perform API requests to see transactions.</p>
-          ) : (
-            logs.map((log, idx) => (
-              <pre key={idx} className="whitespace-pre-wrap text-slate-300 border-b border-slate-900 pb-2 font-mono text-[10px] leading-relaxed">
-                {log}
-              </pre>
-            ))
-          )}
+      </section>
+
+      {/* ── FOOTER ── */}
+      <footer style={{
+        background: '#052016',
+        padding: '16px 36px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+      }}>
+        <div style={{ opacity: 0.5 }}>
+          <span style={{
+            fontFamily: 'Satoshi, sans-serif',
+            fontWeight: 700,
+            fontSize: '13px',
+            background: 'linear-gradient(to right, #0d5c2e, #f9a8d4)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+            letterSpacing: '-0.4px',
+          }}>Tripwire</span>
         </div>
+        <p style={{
+          fontFamily: 'Satoshi, sans-serif',
+          fontWeight: 400,
+          fontSize: '11px',
+          color: 'rgba(255,255,255,0.18)',
+          margin: 0,
+        }}>
+          Built at UC Berkeley AI Hackathon 2026
+        </p>
       </footer>
+    </>
+  )
+}
+
+/* FeatureCard uses a reveal-wrapper outer div so the IntersectionObserver
+   opacity/transform transition never conflicts with the inner hover transition. */
+function FeatureCard({
+  iconBg,
+  iconColor,
+  Icon,
+  title,
+  desc,
+  delayClass,
+}: {
+  iconBg: string
+  iconColor: string
+  Icon: LucideIcon
+  title: string
+  desc: string
+  delayClass: string
+}) {
+  return (
+    <div className={`reveal ${delayClass}`}>
+      <div
+        style={{
+          background: '#fff',
+          border: '1px solid #e5e7eb',
+          borderRadius: '4px',
+          padding: '16px',
+          height: '100%',
+          boxSizing: 'border-box',
+          transition: 'border-color 0.15s, transform 0.15s',
+          cursor: 'default',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.borderColor = '#c6f6d5'
+          e.currentTarget.style.transform = 'translateY(-2px)'
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.borderColor = '#e5e7eb'
+          e.currentTarget.style.transform = 'translateY(0)'
+        }}
+      >
+        <div style={{
+          width: '32px',
+          height: '32px',
+          borderRadius: '4px',
+          background: iconBg,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginBottom: '12px',
+        }}>
+          <Icon size={16} color={iconColor} />
+        </div>
+        <p style={{
+          fontFamily: 'Merriweather, serif',
+          fontWeight: 700,
+          fontSize: '12px',
+          color: '#111827',
+          margin: '0 0 6px',
+          lineHeight: 1.4,
+        }}>{title}</p>
+        <p style={{
+          fontFamily: 'Satoshi, sans-serif',
+          fontWeight: 400,
+          fontSize: '12px',
+          color: '#9ca3af',
+          lineHeight: 1.55,
+          margin: 0,
+        }}>{desc}</p>
+      </div>
     </div>
   )
 }
