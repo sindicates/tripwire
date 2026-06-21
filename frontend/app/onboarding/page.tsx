@@ -301,14 +301,13 @@ function OnboardingContent() {
           </h1>
           <p className="mt-2 text-muted-foreground max-w-md mx-auto">
             {isEdit
-              ? "Update your academic info — changes save immediately."
+              ? "Upload new documents to update your profile automatically, or edit your info below."
               : "Upload your documents and we'll fill this in for you, or enter it manually below."}
           </p>
         </div>
 
         {/* ── Document upload card ── */}
-        {!isEdit && (
-          <div className="bg-white rounded-2xl border border-border shadow-sm p-6 mb-6">
+        <div className="bg-white rounded-2xl border border-border shadow-sm p-6 mb-6">
             <div className="flex items-center gap-2 mb-1">
               <Sparkles size={16} className="text-primary" />
               <span className="text-sm font-semibold text-foreground">Auto-fill from documents</span>
@@ -420,7 +419,6 @@ function OnboardingContent() {
               </div>
             )}
           </div>
-        )}
 
         {/* ── Profile form ── */}
         <div className="bg-white rounded-2xl border border-border shadow-sm p-8">

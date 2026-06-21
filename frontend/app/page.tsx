@@ -29,7 +29,7 @@ export default function LandingPage() {
     <>
       {/* ── NAVBAR ── */}
       <nav style={{
-        background: '#117a3d',
+        background: '#1e3824',
         height: '54px',
         display: 'flex',
         alignItems: 'center',
@@ -93,7 +93,7 @@ export default function LandingPage() {
         <div style={{
           position: 'absolute',
           inset: 0,
-          background: 'linear-gradient(180deg, #117a3d 0%, #1a9649 22%, #21a659 38%, rgba(22,105,56,0.4) 58%, rgba(249,250,251,0.88) 80%, #f9fafb 100%)',
+          background: 'linear-gradient(180deg, #1e3824 0%, #2e5a3c 22%, #3a7050 38%, rgba(30,56,36,0.4) 58%, rgba(249,250,251,0.88) 80%, #f9fafb 100%)',
         }} />
 
         {/* SVG data visualization */}
@@ -103,43 +103,43 @@ export default function LandingPage() {
           preserveAspectRatio="xMidYMid slice"
           xmlns="http://www.w3.org/2000/svg"
         >
-          <ellipse cx="200" cy="480" rx="280" ry="50" fill="#0e562c" opacity="0.5" />
-          <ellipse cx="700" cy="490" rx="400" ry="60" fill="#0c4a23" opacity="0.4" />
-          <ellipse cx="1100" cy="475" rx="220" ry="40" fill="#117a3d" opacity="0.35" />
+          <ellipse cx="200" cy="480" rx="280" ry="50" fill="#0f1a10" opacity="0.5" />
+          <ellipse cx="700" cy="490" rx="400" ry="60" fill="#0f1a10" opacity="0.4" />
+          <ellipse cx="1100" cy="475" rx="220" ry="40" fill="#1e3824" opacity="0.35" />
 
           <polyline
             points="80,430 350,300 600,190 850,110 1100,55"
             fill="none"
-            stroke="#f9a8d4"
+            stroke="#b5b0a8"
             strokeWidth="1.5"
             strokeDasharray="6,5"
             opacity="0.7"
           />
 
-          <circle cx="350" cy="300" r="5" fill="#f9a8d4" opacity="0.9" />
+          <circle cx="350" cy="300" r="5" fill="#b5b0a8" opacity="0.9" />
 
-          <circle cx="600" cy="190" r="22" fill="none" stroke="#f9a8d4" strokeWidth="0.8" opacity="0.2" />
-          <circle cx="600" cy="190" r="13" fill="none" stroke="#f9a8d4" strokeWidth="1" opacity="0.4" />
-          <circle cx="600" cy="190" r="5" fill="#f9a8d4" opacity="0.9" />
+          <circle cx="600" cy="190" r="22" fill="none" stroke="#b5b0a8" strokeWidth="0.8" opacity="0.2" />
+          <circle cx="600" cy="190" r="13" fill="none" stroke="#b5b0a8" strokeWidth="1" opacity="0.4" />
+          <circle cx="600" cy="190" r="5" fill="#b5b0a8" opacity="0.9" />
 
-          <circle cx="850" cy="110" r="5" fill="#f9a8d4" opacity="0.9" />
+          <circle cx="850" cy="110" r="5" fill="#b5b0a8" opacity="0.9" />
 
           <g transform="translate(110, 72)">
             <rect width="164" height="102" rx="3" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.2)" strokeWidth="1" />
-            <rect x="10" y="12" width="52" height="8" rx="2" fill="#f9a8d4" opacity="0.7" />
+            <rect x="10" y="12" width="52" height="8" rx="2" fill="#b5b0a8" opacity="0.7" />
             <rect x="10" y="30" width="124" height="5" rx="1.5" fill="rgba(255,255,255,0.18)" />
             <rect x="10" y="42" width="94" height="5" rx="1.5" fill="rgba(255,255,255,0.12)" />
             <rect x="10" y="54" width="108" height="5" rx="1.5" fill="rgba(255,255,255,0.12)" />
-            <rect x="10" y="74" width="50" height="16" rx="2" fill="#f9a8d4" opacity="0.6" />
+            <rect x="10" y="74" width="50" height="16" rx="2" fill="#b5b0a8" opacity="0.6" />
           </g>
 
           <g transform="translate(878, 195)">
             <rect width="158" height="96" rx="3" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.2)" strokeWidth="1" />
-            <rect x="10" y="12" width="62" height="8" rx="2" fill="#f9a8d4" opacity="0.65" />
+            <rect x="10" y="12" width="62" height="8" rx="2" fill="#b5b0a8" opacity="0.65" />
             <rect x="10" y="30" width="118" height="5" rx="1.5" fill="rgba(255,255,255,0.18)" />
             <rect x="10" y="42" width="88" height="5" rx="1.5" fill="rgba(255,255,255,0.12)" />
             <rect x="10" y="54" width="102" height="5" rx="1.5" fill="rgba(255,255,255,0.12)" />
-            <rect x="10" y="70" width="46" height="15" rx="2" fill="#f9a8d4" opacity="0.6" />
+            <rect x="10" y="70" width="46" height="15" rx="2" fill="#b5b0a8" opacity="0.6" />
           </g>
         </svg>
 
@@ -205,7 +205,7 @@ export default function LandingPage() {
             <button
               onClick={() => router.push('/register')}
               style={{
-                background: '#f9a8d4',
+                background: '#b5b0a8',
                 color: '#fff',
                 fontFamily: 'Satoshi, sans-serif',
                 fontWeight: 700,
@@ -216,8 +216,8 @@ export default function LandingPage() {
                 cursor: 'pointer',
                 transition: 'background 0.15s, transform 0.1s',
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = '#e8619f')}
-              onMouseLeave={(e) => (e.currentTarget.style.background = '#f9a8d4')}
+              onMouseEnter={(e) => (e.currentTarget.style.background = '#8a8680')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = '#b5b0a8')}
               onMouseDown={(e) => (e.currentTarget.style.transform = 'scale(0.97)')}
               onMouseUp={(e) => (e.currentTarget.style.transform = 'scale(1)')}
             >
@@ -262,7 +262,7 @@ export default function LandingPage() {
             fontWeight: 400,
             fontStyle: 'italic',
             fontSize: '11px',
-            color: '#f9a8d4',
+            color: '#b5b0a8',
             margin: '0 0 12px',
             textTransform: 'uppercase',
             letterSpacing: '0.6px',
@@ -274,7 +274,7 @@ export default function LandingPage() {
             fontFamily: 'Merriweather, serif',
             fontWeight: 700,
             fontSize: '22px',
-            color: '#117a3d',
+            color: '#1e3824',
             maxWidth: '500px',
             lineHeight: 1.28,
             margin: '0 0 20px',
@@ -297,7 +297,7 @@ export default function LandingPage() {
           {/* Quote block */}
           <blockquote className="reveal stagger-2" style={{
             background: '#f0fdf4',
-            borderLeft: '3px solid #117a3d',
+            borderLeft: '3px solid #1e3824',
             borderRadius: '0 4px 4px 0',
             padding: '18px 20px',
             margin: '0 0 32px',
@@ -307,7 +307,7 @@ export default function LandingPage() {
               fontWeight: 400,
               fontStyle: 'italic',
               fontSize: '14px',
-              color: '#117a3d',
+              color: '#1e3824',
               lineHeight: 1.7,
               margin: '0 0 10px',
             }}>
@@ -341,7 +341,7 @@ export default function LandingPage() {
             />
             <FeatureCard
               iconBg="#fce7f3"
-              iconColor="#be185d"
+              iconColor="#9aafa0"
               Icon={FileText}
               title="Grounded in your school's actual rules"
               desc="Every alert cites official financial aid and registrar documents. No guessing."
@@ -349,7 +349,7 @@ export default function LandingPage() {
             />
             <FeatureCard
               iconBg="#f0fdf4"
-              iconColor="#117a3d"
+              iconColor="#1e3824"
               Icon={ListChecks}
               title="Exact next steps, not vague suggestions"
               desc='Each risk comes with the specific form, deadline, and office — not "contact your advisor."'
@@ -359,7 +359,7 @@ export default function LandingPage() {
 
           {/* Stats strip */}
           <div className="reveal-scale" style={{
-            background: '#117a3d',
+            background: '#1e3824',
             borderRadius: '4px',
             display: 'grid',
             gridTemplateColumns: 'repeat(3, 1fr)',
@@ -378,7 +378,7 @@ export default function LandingPage() {
                   fontFamily: 'Merriweather, serif',
                   fontWeight: 900,
                   fontSize: '26px',
-                  color: '#f9a8d4',
+                  color: '#b5b0a8',
                   margin: '0 0 4px',
                 }}>{num}</p>
                 <p style={{
@@ -408,7 +408,7 @@ export default function LandingPage() {
             fontWeight: 400,
             fontStyle: 'italic',
             fontSize: '11px',
-            color: '#f9a8d4',
+            color: '#b5b0a8',
             margin: '0 0 12px',
             textTransform: 'uppercase',
             letterSpacing: '0.6px',
@@ -420,7 +420,7 @@ export default function LandingPage() {
             fontFamily: 'Merriweather, serif',
             fontWeight: 700,
             fontSize: '22px',
-            color: '#117a3d',
+            color: '#1e3824',
             lineHeight: 1.28,
             margin: '0 0 32px',
           }}>
@@ -469,7 +469,7 @@ export default function LandingPage() {
                   width: '24px',
                   height: '24px',
                   borderRadius: '3px',
-                  background: '#117a3d',
+                  background: '#1e3824',
                   color: '#fff',
                   fontFamily: 'Merriweather, serif',
                   fontWeight: 700,
@@ -505,7 +505,7 @@ export default function LandingPage() {
 
       {/* ── CTA ── */}
       <section style={{
-        background: '#117a3d',
+        background: '#1e3824',
         padding: '52px 36px',
         textAlign: 'center',
       }}>
@@ -535,7 +535,7 @@ export default function LandingPage() {
           <button
             onClick={() => router.push('/register')}
             style={{
-              background: '#f9a8d4',
+              background: '#b5b0a8',
               color: '#fff',
               fontFamily: 'Satoshi, sans-serif',
               fontWeight: 700,
@@ -546,8 +546,8 @@ export default function LandingPage() {
               cursor: 'pointer',
               transition: 'background 0.15s, transform 0.1s',
             }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = '#e8619f')}
-            onMouseLeave={(e) => (e.currentTarget.style.background = '#f9a8d4')}
+            onMouseEnter={(e) => (e.currentTarget.style.background = '#8a8680')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = '#b5b0a8')}
             onMouseDown={(e) => (e.currentTarget.style.transform = 'scale(0.97)')}
             onMouseUp={(e) => (e.currentTarget.style.transform = 'scale(1)')}
           >
@@ -558,7 +558,7 @@ export default function LandingPage() {
 
       {/* ── FOOTER ── */}
       <footer style={{
-        background: '#117a3d',
+        background: '#1e3824',
         padding: '16px 36px',
         display: 'flex',
         alignItems: 'center',
@@ -569,7 +569,7 @@ export default function LandingPage() {
             fontFamily: 'Satoshi, sans-serif',
             fontWeight: 700,
             fontSize: '13px',
-            background: 'linear-gradient(to right, #117a3d, #f9a8d4)',
+            background: 'linear-gradient(to right, #1e3824, #b5b0a8)',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
             backgroundClip: 'text',

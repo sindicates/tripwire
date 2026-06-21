@@ -69,7 +69,7 @@ export default function LoginPage() {
           </svg>
         </div>
         <h1 className="text-3xl font-bold text-foreground">Welcome back</h1>
-        <p className="mt-2 text-muted-foreground">Sign in to your Tripwire account</p>
+        <p className="mt-2 text-muted-foreground">Sign in to your Sherpa account</p>
       </div>
 
       <div className="bg-white rounded-2xl border border-border shadow-sm p-8">
