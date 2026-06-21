@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect, useRef, useCallback, Suspense } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Upload, X, FileText, Sparkles, CheckCircle } from "lucide-react"
 
@@ -78,13 +78,25 @@ function Field({ label, children, filled }: { label: string; children: React.Rea
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function OnboardingPage() {
-  const router = useRouter()
+  return (
+    <Suspense fallback={<main className="min-h-screen bg-background flex items-center justify-center"><div className="text-muted-foreground text-sm">Loading…</div></main>}>
+      <OnboardingContent />
+    </Suspense>
+  )
+}
+
+function OnboardingContent() {
+  const router       = useRouter()
+  const searchParams = useSearchParams()
+  const verified     = searchParams.get("verified") === "true"
+
   const [saving,    setSaving]    = useState(false)
   const [loading,   setLoading]   = useState(true)
   const [error,     setError]     = useState<string | null>(null)
   const [isEdit,    setIsEdit]    = useState(false)
   const [form,      setForm]      = useState(EMPTY_FORM)
   const [filled,    setFilled]    = useState<Set<keyof typeof EMPTY_FORM>>(new Set())
+  const [showVerifiedBanner, setShowVerifiedBanner] = useState(verified)
 
   // Upload state
   const [files,       setFiles]       = useState<File[]>([])
@@ -263,6 +275,19 @@ export default function OnboardingPage() {
   return (
     <main className="min-h-screen bg-background py-12 px-4">
       <div className="mx-auto max-w-2xl">
+
+        {/* Email verified banner */}
+        {showVerifiedBanner && (
+          <div className="mb-6 flex items-center justify-between gap-3 rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-3">
+            <div className="flex items-center gap-2.5">
+              <CheckCircle size={16} className="text-emerald-500 flex-shrink-0" />
+              <span className="text-sm font-medium text-emerald-800">Email verified — welcome to Sherpa!</span>
+            </div>
+            <button onClick={() => setShowVerifiedBanner(false)} className="text-emerald-500 hover:text-emerald-700 transition flex-shrink-0">
+              <X size={14} />
+            </button>
+          </div>
+        )}
 
         {/* Header */}
         <div className="mb-8 text-center">

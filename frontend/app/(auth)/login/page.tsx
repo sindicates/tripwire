@@ -30,7 +30,7 @@ export default function LoginPage() {
     setLoading(true)
 
     const supabase = createClient()
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
     if (error) {
       setError(error.message)
@@ -38,7 +38,15 @@ export default function LoginPage() {
       return
     }
 
-    router.push("/dashboard")
+    // Route new users to onboarding, returning users to dashboard
+    const { data: profile } = await supabase
+      .from("students")
+      .select("onboarding_complete")
+      .eq("user_id", data.user.id)
+      .single()
+
+    const dest = profile?.onboarding_complete ? "/dashboard" : "/onboarding"
+    router.push(dest)
     router.refresh()
   }
 

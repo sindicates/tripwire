@@ -1,9 +1,9 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
+import { Mail } from "lucide-react"
 
 function GoogleIcon() {
   return (
@@ -17,39 +17,35 @@ function GoogleIcon() {
 }
 
 export default function RegisterPage() {
-  const router = useRouter()
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [confirm, setConfirm] = useState("")
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [email,         setEmail]         = useState("")
+  const [password,      setPassword]      = useState("")
+  const [confirm,       setConfirm]       = useState("")
+  const [error,         setError]         = useState<string | null>(null)
+  const [loading,       setLoading]       = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
+  const [emailSent,     setEmailSent]     = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
 
-    if (password !== confirm) {
-      setError("Passwords do not match.")
-      return
-    }
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters.")
-      return
-    }
+    if (password !== confirm) { setError("Passwords do not match."); return }
+    if (password.length < 6)  { setError("Password must be at least 6 characters."); return }
 
     setLoading(true)
     const supabase = createClient()
-    const { error } = await supabase.auth.signUp({ email, password })
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=/onboarding&verified=true`,
+      },
+    })
 
-    if (error) {
-      setError(error.message)
-      setLoading(false)
-      return
-    }
+    if (error) { setError(error.message); setLoading(false); return }
 
-    router.push("/onboarding")
-    router.refresh()
+    setEmailSent(true)
+    setLoading(false)
   }
 
   async function handleGoogle() {
@@ -58,10 +54,42 @@ export default function RegisterPage() {
     const supabase = createClient()
     await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: `${window.location.origin}/auth/callback?next=/onboarding` },
+      options: { redirectTo: `${window.location.origin}/auth/callback?next=/onboarding&verified=true` },
     })
   }
 
+  // ── Check your email screen ────────────────────────────────────────────────
+  if (emailSent) {
+    return (
+      <div className="w-full max-w-md">
+        <div className="bg-white rounded-2xl border border-border shadow-sm p-10 text-center">
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-primary/10 mb-5">
+            <Mail className="w-7 h-7 text-primary" />
+          </div>
+          <h2 className="text-2xl font-bold text-foreground mb-2">Check your email</h2>
+          <p className="text-muted-foreground text-sm leading-relaxed mb-1">We sent a verification link to</p>
+          <p className="font-semibold text-foreground text-sm mb-5">{email}</p>
+          <p className="text-muted-foreground text-sm leading-relaxed">
+            Click the link in the email to verify your account and get started with Sherpa.
+          </p>
+          <div className="mt-8 pt-6 border-t border-border">
+            <p className="text-xs text-muted-foreground">
+              Didn&apos;t get it? Check your spam folder or{" "}
+              <button
+                onClick={() => { setEmailSent(false); setError(null) }}
+                className="text-primary font-medium hover:underline"
+              >
+                try again
+              </button>
+              .
+            </p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Register form ──────────────────────────────────────────────────────────
   return (
     <div className="w-full max-w-md">
       <div className="mb-8 text-center">
@@ -75,11 +103,8 @@ export default function RegisterPage() {
       </div>
 
       <div className="bg-white rounded-2xl border border-border shadow-sm p-8">
-        {/* Google */}
         <button
-          type="button"
-          onClick={handleGoogle}
-          disabled={googleLoading}
+          type="button" onClick={handleGoogle} disabled={googleLoading}
           className="w-full flex items-center justify-center gap-3 rounded-lg border border-border bg-white py-2.5 px-4 text-sm font-medium text-foreground hover:bg-muted focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition"
         >
           <GoogleIcon />
@@ -94,62 +119,29 @@ export default function RegisterPage() {
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-foreground mb-1.5">
-              Email address
-            </label>
-            <input
-              id="email"
-              type="email"
-              required
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+            <label htmlFor="email" className="block text-sm font-medium text-foreground mb-1.5">Email address</label>
+            <input id="email" type="email" required autoComplete="email" value={email} onChange={e => setEmail(e.target.value)}
               className="w-full rounded-lg border border-input bg-white px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition"
-              placeholder="you@university.edu"
-            />
+              placeholder="you@university.edu" />
           </div>
-
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-foreground mb-1.5">
-              Password
-            </label>
-            <input
-              id="password"
-              type="password"
-              required
-              autoComplete="new-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+            <label htmlFor="password" className="block text-sm font-medium text-foreground mb-1.5">Password</label>
+            <input id="password" type="password" required autoComplete="new-password" value={password} onChange={e => setPassword(e.target.value)}
               className="w-full rounded-lg border border-input bg-white px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition"
-              placeholder="At least 6 characters"
-            />
+              placeholder="At least 6 characters" />
           </div>
-
           <div>
-            <label htmlFor="confirm" className="block text-sm font-medium text-foreground mb-1.5">
-              Confirm password
-            </label>
-            <input
-              id="confirm"
-              type="password"
-              required
-              autoComplete="new-password"
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
+            <label htmlFor="confirm" className="block text-sm font-medium text-foreground mb-1.5">Confirm password</label>
+            <input id="confirm" type="password" required autoComplete="new-password" value={confirm} onChange={e => setConfirm(e.target.value)}
               className="w-full rounded-lg border border-input bg-white px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition"
-              placeholder="••••••••"
-            />
+              placeholder="••••••••" />
           </div>
 
           {error && (
-            <div className="rounded-lg bg-destructive/10 border border-destructive/20 px-4 py-3 text-sm text-destructive">
-              {error}
-            </div>
+            <div className="rounded-lg bg-destructive/10 border border-destructive/20 px-4 py-3 text-sm text-destructive">{error}</div>
           )}
 
-          <button
-            type="submit"
-            disabled={loading}
+          <button type="submit" disabled={loading}
             className="w-full rounded-lg bg-primary text-primary-foreground py-2.5 px-4 text-sm font-semibold hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition"
           >
             {loading ? "Creating account…" : "Create account"}
@@ -158,9 +150,7 @@ export default function RegisterPage() {
 
         <p className="mt-6 text-center text-sm text-muted-foreground">
           Already have an account?{" "}
-          <Link href="/login" className="text-primary font-medium hover:underline">
-            Sign in
-          </Link>
+          <Link href="/login" className="text-primary font-medium hover:underline">Sign in</Link>
         </p>
       </div>
     </div>
