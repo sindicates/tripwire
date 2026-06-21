@@ -65,10 +65,10 @@ Three surfaces: web dashboard (Next.js), mobile app (Expo), and push/SMS notific
 
 ### Env & config
 
-- `backend/.env` holds all backend secrets; loaded by `app/config.py` via `pydantic-settings`.
-- `frontend/.env.local` holds `NEXT_PUBLIC_API_URL`.
-- `mobile/.env` holds `EXPO_PUBLIC_API_URL` (use LAN IP on physical device, not `localhost`).
-- `backend/app/config.py` — single `Settings` class; import `settings` from here everywhere, never `os.environ` directly.
+- **Single `.env` at the repo root** holds all variables for every service. Copy once: `cp .env.example .env`.
+- `frontend/.env.local` and `mobile/.env` are symlinks pointing to `../.env` — created automatically by `make setup`. Never edit them directly.
+- `backend/app/config.py` reads `("../.env", ".env")` — root first, local fallback. Always `cd backend` before running uvicorn/celery/alembic so the relative path resolves correctly.
+- Import `settings` from `app.config` everywhere in the backend; never read `os.environ` directly.
 
 ### AI
 
@@ -142,12 +142,10 @@ When adding a rule: add constant to `risk_engine.py`, add enum value to both `ty
 
 ```bash
 # First time
-cp backend/.env.example backend/.env       # fill in ANTHROPIC_API_KEY, OPENAI_API_KEY, SECRET_KEY
-cp frontend/.env.local.example frontend/.env.local
+cp .env.example .env                         # fill in ANTHROPIC_API_KEY, OPENAI_API_KEY, SECRET_KEY
+make setup                                   # or: python -m venv backend/.venv && pip install -r requirements.txt
 docker compose up -d
-cd backend && python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-alembic upgrade head
+source backend/.venv/bin/activate && cd backend && alembic upgrade head
 
 # Daily (5 terminals)
 docker compose up -d                                            # T1: infra
@@ -170,4 +168,42 @@ cd mobile && npx expo start                                     # Expo Go / simu
 
 ## Feature log
 
-*No features implemented yet. When you ship something, add a section below following the pattern above (what it does, where it lives, any new env vars or DB migrations).*
+### RAG Pipeline (2026-06-20)
+
+**What it does:** Full ingest → retrieve → generate loop for school policy documents.
+
+- **Ingest** (`POST /api/v1/documents/ingest`) — fetches a URL with httpx + BeautifulSoup, strips nav/footer noise, chunks at 400 tokens / 50-token overlap preserving section headings, embeds with `text-embedding-3-small`, upserts to `doc_chunks` tagged with `school_id`.
+- **Query** (`POST /api/v1/chat/query`) — embeds the question, runs cosine similarity search via pgvector comparator (`.cosine_distance()`) scoped to `school_id`, re-ranks top-15 by a weighted score (80% cosine similarity, 20% recency), passes top-5 to Claude which returns a plain-language answer with `Sources:` citations.
+
+**Where it lives:**
+- `backend/app/services/rag.py` — `RAGService` (singleton `rag_service`)
+- `backend/app/routers/documents.py` — ingest + list + get endpoints
+- `backend/app/routers/chat.py` — query endpoint
+
+**New dependencies:** `httpx>=0.27.0`, `tiktoken>=0.8.0` (added to `backend/pyproject.toml`)
+
+**No new DB migrations** — uses existing `documents` and `doc_chunks` tables.
+
+**Required env vars:** `OPENAI_API_KEY` (embeddings), `ANTHROPIC_API_KEY` (generation).
+
+---
+
+### Core Backend — Risk Engine, Auth, CRUD Routers (2026-06-20)
+
+**What it does:** Completes the full backend API surface.
+
+**Risk Engine** (`backend/app/services/risk_engine.py`):
+- `scan_student(student_id, session)` / `scan_all(session)` — evaluates 5 rules (`gpa_drop`, `credit_deficit`, `aid_risk`, `academic_probation`, `satisfactory_academic_progress`) per student, respects per-rule cooldown windows, calls RAG to build a school-specific action packet when a rule fires, persists `RiskEvent` rows.
+- Nightly scan wired into `celery_app.py` via `asyncio.run()` so async DB layer works inside sync Celery task.
+- `deadline_miss` rule is defined but not yet implemented — requires date extraction from policy chunks.
+
+**Auth** (`backend/app/routers/auth.py`, `backend/app/dependencies.py`):
+- `POST /auth/register` / `POST /auth/login` / `POST /auth/refresh` — bcrypt passwords, HS256 JWT (24h TTL).
+- `get_current_student` dependency in `app/dependencies.py` — used by `/students/me` and `/students/me PUT`.
+- **Requires migration**: added `password_hash TEXT` (nullable) to `students` table. Run: `alembic revision --autogenerate -m "add password_hash to students" && alembic upgrade head`.
+
+**Routers implemented:**
+- `backend/app/routers/schools.py` — full CRUD + `POST /{id}/ingest` status toggle
+- `backend/app/routers/students.py` — `/me` (auth-gated), `/{id}`, `/{id}/risk-events`, `/{id}/alerts`, `/{id}/scan`
+- `backend/app/routers/risk_events.py` — list (filterable by student + severity), get, resolve
+- `backend/app/routers/alerts.py` — list, dispatch (record-only, no email/SMS yet), get, mark-opened

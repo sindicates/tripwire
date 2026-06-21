@@ -1,0 +1,2 @@
+# Backend dependencies — editable install; source of truth is backend/pyproject.toml
+-e backend
