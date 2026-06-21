@@ -43,7 +43,7 @@ export default function SettingsPage() {
         <p style={{ color: "#a3c4a8", margin: "0 0 36px", fontSize: 15 }}>Manage your account and preferences.</p>
 
         <section>
-          <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 16, margin: "0 0 14px", color: "#a3c4a8", textTransform: "uppercase", letterSpacing: "0.07em", fontSize: 11 }}>Account</h2>
+          <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 11, margin: "0 0 14px", color: "#a3c4a8", textTransform: "uppercase", letterSpacing: "0.07em" }}>Account</h2>
           <div style={{ background: "#0d1f13", border: "1px solid #1e3d28", borderRadius: 14, overflow: "hidden" }}>
             <button
               onClick={() => router.push("/onboarding")}

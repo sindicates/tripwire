@@ -54,13 +54,14 @@ export async function POST(req: NextRequest) {
     const base64 = buffer.toString("base64")
     const mime = file.type
 
-    let contentBlock: Anthropic.MessageParam["content"][number]
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let contentBlock: any
 
     if (mime === "application/pdf") {
       contentBlock = {
         type: "document",
         source: { type: "base64", media_type: "application/pdf", data: base64 },
-      } as unknown as Anthropic.MessageParam["content"][number]
+      }
     } else if (IMAGE_TYPES.includes(mime as SupportedImageType)) {
       contentBlock = {
         type: "image",
@@ -74,10 +75,8 @@ export async function POST(req: NextRequest) {
       const msg = await client.messages.create({
         model: "claude-sonnet-4-6",
         max_tokens: 1024,
-        messages: [{
-          role: "user",
-          content: [contentBlock, { type: "text", text: PROMPT }],
-        }],
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        messages: [{ role: "user", content: [contentBlock, { type: "text", text: PROMPT }] as any }],
       })
 
       const text = msg.content.find(b => b.type === "text")?.text ?? ""
