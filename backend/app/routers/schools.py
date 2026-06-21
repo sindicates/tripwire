@@ -1,13 +1,14 @@
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.school import School
+from app.services.rag import rag_service
 
 router = APIRouter(prefix="/schools", tags=["schools"])
 
@@ -16,6 +17,7 @@ class SchoolCreate(BaseModel):
     name: str
     ipeds_id: str | None = None
     scorecard_id: str | None = None
+    financial_aid_url: str | None = None
 
 
 class SchoolUpdate(BaseModel):
@@ -23,6 +25,7 @@ class SchoolUpdate(BaseModel):
     ipeds_id: str | None = None
     scorecard_id: str | None = None
     doc_ingestion_status: str | None = None
+    financial_aid_url: str | None = None
 
 
 class SchoolOut(BaseModel):
@@ -30,6 +33,7 @@ class SchoolOut(BaseModel):
     name: str
     ipeds_id: str | None
     scorecard_id: str | None
+    financial_aid_url: str | None
     doc_ingestion_status: str
     last_ingested_at: datetime | None
 
@@ -37,8 +41,14 @@ class SchoolOut(BaseModel):
 
 
 @router.get("/", response_model=list[SchoolOut])
-async def list_schools(db: AsyncSession = Depends(get_db)) -> list[School]:
-    result = await db.execute(select(School))
+async def list_schools(
+    name: str | None = None,
+    db: AsyncSession = Depends(get_db),
+) -> list[School]:
+    stmt = select(School)
+    if name:
+        stmt = stmt.where(School.name.ilike(f"%{name}%"))
+    result = await db.execute(stmt)
     return list(result.scalars().all())
 
 
@@ -77,14 +87,21 @@ async def update_school(
 
 @router.post("/{school_id}/ingest", response_model=SchoolOut)
 async def trigger_ingestion(
-    school_id: uuid.UUID, db: AsyncSession = Depends(get_db)
+    school_id: uuid.UUID,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
 ) -> School:
-    """Mark school as in-progress; actual ingestion is per-document via POST /documents/ingest."""
     result = await db.execute(select(School).where(School.id == school_id))
     school = result.scalar_one_or_none()
     if school is None:
         raise HTTPException(status_code=404, detail="School not found")
+    if not school.financial_aid_url:
+        raise HTTPException(
+            status_code=400,
+            detail="Set financial_aid_url on this school before triggering ingestion",
+        )
     school.doc_ingestion_status = "in_progress"
     await db.commit()
     await db.refresh(school)
+    background_tasks.add_task(rag_service._background_ingest, school_id, school.financial_aid_url)
     return school

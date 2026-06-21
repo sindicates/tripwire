@@ -65,8 +65,8 @@
   ::-webkit-scrollbar-thumb:hover { background: #3a7044; }
 }
 
-/* ── Brand wordmark ───────────────────────────────── */
-.nav-brand {
+/* ── Brand wordmark (dashboard sidebar) ──────────── */
+.sidebar-brand {
   font-family: 'Satoshi', sans-serif;
   font-weight: 700;
   font-size: 22px;

@@ -14,6 +14,7 @@ class School(Base):
     name: Mapped[str] = mapped_column(String, nullable=False)
     ipeds_id: Mapped[str | None] = mapped_column(String, nullable=True)
     scorecard_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    financial_aid_url: Mapped[str | None] = mapped_column(String, nullable=True)
     doc_ingestion_status: Mapped[str] = mapped_column(String, default="pending")
     last_ingested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
