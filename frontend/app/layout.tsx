@@ -4,6 +4,7 @@ import "./globals.css"
 export const metadata: Metadata = {
   title: "Sherpa",
   description: "Proactive academic risk monitoring",
+  icons: { icon: "/logo.png", apple: "/logo.png" },
 }
 
 export default function RootLayout({
