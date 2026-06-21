@@ -230,6 +230,57 @@ cd mobile && npx expo start                                     # Expo Go / simu
 
 ---
 
+### Interactive Advisor Context & Search-Discovery Agent (2026-06-21)
+
+**What it does:** Wires Dashboard & Action Center cards to the Advisor Chat with pre-seeded context, and implements a multi-category search discovery and crawl agent.
+
+**Advisor Context Routing:**
+- Added a "Talk to Advisor" button to both the **Dashboard** Risk Card (`frontend/app/dashboard/page.tsx`) and the **Action Center** expand card (`frontend/app/actions/page.tsx`).
+- These buttons route the student to `/chat?risk_id=<risk_event_id>`.
+- **Advisor Chat Page** (`frontend/app/chat/page.tsx`) detects `risk_id` URL param, fetches the specific `RiskEvent`, and initializes the chat with a customized greeting showing the risk title, description, and suggested action steps.
+- **FastAPI /query Endpoint & RAGService** (`backend/app/routers/chat.py` & `backend/app/services/rag.py`): Accepts optional `risk_id` in payload, loads the risk details, and prepends a detailed `Student Risk Context` block to the system context so Claude is fully grounded in the specific academic risk during Q&A.
+
+**Search-Discovery Agent** (`backend/scripts/discover_and_ingest.py`):
+- Automated script to discover policies for academic notice/probation and deadlines/calendars in addition to financial aid/SAP.
+- Performs targeted searches per category, filters domains to matching `.edu` sites, leverages Claude to rank/select the top 3-5 most relevant seed URLs, and crawls/ingests them into `doc_chunks`.
+
+**No new DB migrations. Optional `TAVILY_API_KEY` env var added to enable live searches in discovery script.**
+
+---
+
+### Fetch.ai uAgent Research Agent (2026-06-21)
+
+**What it does:** Replaces the in-process research step with a standalone Fetch.ai uAgent process that performs autonomous web research when a risk rule fires. The agent receives a `ResearchRequest` (risk type, school name, student snapshot), uses Tavily search and httpx page fetching to find exact form names, deadlines, contact info, and policy excerpts, and returns a structured `ResearchBundle`. The existing Claude synthesis step then converts this bundle into a specific, actionable packet — no more generic "contact your financial aid office" boilerplate.
+
+**Architecture:**
+- **uAgent process** (port 8001) — runs Claude tool-use loop with `search_web` + `fetch_page`, returns `ResearchBundle` via REST POST at `/rest/research`
+- **FastAPI backend** calls uAgent via HTTP (UAgentClient); if uAgent is down, falls back silently to in-process `ResearchAgent`
+- **No change** to Stage 2 (Claude synthesis call) or the risk rule engine
+
+**Where it lives:**
+- `backend/app/services/uagent_researcher.py` — Fetch.ai agent definition, message models, research loop
+- `backend/app/services/uagent_client.py` — HTTP client for FastAPI → uAgent communication
+- `backend/scripts/run_research_agent.py` — entry point to start the agent process
+- `backend/app/services/risk_engine.py` — updated `build_action_packet()` with uAgent-first + fallback
+
+**How to start:**
+```bash
+# Terminal 6 (alongside the existing 5 terminals)
+cd backend && python -m scripts.run_research_agent
+```
+
+**New dependencies:** `uagents>=0.17.0` (Fetch.ai agent framework)
+
+**New env vars (all have dev defaults):**
+- `UAGENT_SEED` — seed phrase for deterministic agent address (default: `sherpa-research-agent-dev`)
+- `UAGENT_PORT` — port the agent listens on (default: `8001`)
+- `UAGENT_ENDPOINT` — agent endpoint URL (default: `http://localhost:8001/submit`)
+- `UAGENT_TIMEOUT` — seconds to wait for research response (default: `45`)
+
+**No new DB migrations required.**
+
+---
+
 ## Design system (Sherpa Mountain Theme)
 
 The product was renamed **Sherpa** (from Tripwire). All user-facing text uses "Sherpa". Codebase folder/repo still named `tripwire`.

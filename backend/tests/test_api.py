@@ -49,7 +49,8 @@ async def test_schools_crud():
         school_data = {
             "name": "Antigravity University",
             "ipeds_id": "123456",
-            "scorecard_id": "987"
+            "scorecard_id": "987",
+            "financial_aid_url": "https://example.edu/aid"
         }
         response = await ac.post("/api/v1/schools/", json=school_data)
         assert response.status_code == 201

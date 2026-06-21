@@ -17,7 +17,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.add_column("students", sa.Column("supabase_user_id", sa.String(), nullable=True))
+    op.execute("ALTER TABLE students ADD COLUMN IF NOT EXISTS supabase_user_id VARCHAR")
     op.execute("CREATE UNIQUE INDEX IF NOT EXISTS ix_students_supabase_user_id ON students (supabase_user_id)")
 
 

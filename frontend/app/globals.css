@@ -199,15 +199,145 @@
 /* ── Chat input ──────────────────────────────────── */
 .tw-chat-input:focus { outline: none; border-color: #b5b0a8 !important; box-shadow: 0 0 0 3px rgba(181, 176, 168, 0.15); }
 
+/* ── Dynamic Sidebar Wrapper ── */
+.tw-sidebar-wrapper {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  width: 72px; /* Collapsed width on desktop */
+  flex-shrink: 0;
+  z-index: 50;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── Dynamic Sidebar Container ── */
+.tw-sidebar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 72px; /* Collapsed by default */
+  min-width: 72px;
+  background: #1e3824;
+  border-right: 1px solid #2a5636;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease;
+  z-index: 50;
+  overflow: visible !important; /* Allow indicators to stick out */
+}
+
+/* ── Content Wrapper ── */
+.tw-sidebar-content-wrapper {
+  width: 100%;
+  height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Hover Expansion (Desktop only) ── */
+@media (min-width: 769px) {
+  .tw-sidebar:hover {
+    width: 240px;
+    box-shadow: 8px 0 32px rgba(0, 0, 0, 0.5);
+  }
+  
+  /* Text and items transitions */
+  .tw-sidebar-label,
+  .tw-sidebar-user-text,
+  .tw-sidebar-logo-text {
+    opacity: 0;
+    transform: translateX(-10px);
+    transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1), transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    white-space: nowrap;
+  }
+  
+  .tw-sidebar:hover .tw-sidebar-label,
+  .tw-sidebar:hover .tw-sidebar-user-text,
+  .tw-sidebar:hover .tw-sidebar-logo-text {
+    opacity: 1;
+    transform: translateX(0);
+    transition-delay: 0.05s;
+  }
+}
+
+/* ── Sidebar Indicator (Desktop only) ── */
+@media (min-width: 769px) {
+  .tw-sidebar-indicator {
+    position: absolute;
+    top: 50%;
+    right: -10px;
+    transform: translateY(-50%);
+    width: 20px;
+    height: 48px;
+    background: #1e3824;
+    border: 1px solid #2a5636;
+    border-left: none;
+    border-radius: 0 8px 8px 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 52;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 4px 0 10px rgba(0, 0, 0, 0.25);
+    color: #9aafa0;
+  }
+
+  .tw-sidebar:hover .tw-sidebar-indicator {
+    background: #2a5636;
+    border-color: #3a7044;
+    color: #ffffff;
+  }
+
+  .tw-sidebar-indicator svg {
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .tw-sidebar:hover .tw-sidebar-indicator svg {
+    transform: rotate(180deg);
+  }
+
+  /* Pulsing glow strip on the edge when collapsed */
+  .tw-sidebar-glow-strip {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 3px;
+    height: 100%;
+    background: linear-gradient(to bottom, transparent, #b5b0a8, transparent);
+    opacity: 0.4;
+    pointer-events: none;
+    z-index: 51;
+    transition: opacity 0.3s ease;
+    animation: sidebarPulse 3s infinite ease-in-out;
+  }
+
+  .tw-sidebar:hover .tw-sidebar-glow-strip {
+    opacity: 0;
+  }
+}
+
+@keyframes sidebarPulse {
+  0%, 100% { opacity: 0.15; }
+  50% { opacity: 0.5; }
+}
+
 /* ── Responsive sidebar ──────────────────────────── */
 @media (max-width: 768px) {
-  .tw-sidebar { width: 64px !important; min-width: 64px !important; }
+  .tw-sidebar-wrapper { width: 64px !important; }
+  .tw-sidebar { width: 64px !important; min-width: 64px !important; position: sticky !important; }
+  .tw-sidebar-content-wrapper { overflow-x: visible; }
   .tw-sidebar-label, .tw-sidebar-user-text, .tw-sidebar-logo-text { display: none !important; }
   .tw-sidebar-logo { justify-content: center !important; padding: 0 0 32px !important; }
   .tw-nav-link { justify-content: center; padding: 12px !important; }
   .tw-sidebar-user { justify-content: center !important; padding: 16px 0 !important; }
   .tw-main-content { padding: 24px 20px !important; }
   .tw-stat-grid { grid-template-columns: 1fr !important; }
+  .tw-sidebar-indicator, .tw-sidebar-glow-strip { display: none !important; }
 }
 
 @media (max-width: 640px) {

@@ -15,6 +15,7 @@ class Settings(BaseSettings):
 
     ANTHROPIC_API_KEY: str = ""
     OPENAI_API_KEY: str = ""
+    TAVILY_API_KEY: str = ""
 
     SUPABASE_URL: str = ""
     SUPABASE_PUBLIC_KEY: str = ""
@@ -36,6 +37,12 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     # Stored as str so pydantic-settings never tries to JSON-parse it from env
     ALLOWED_ORIGINS: str = "http://localhost:3000"
+
+    # Fetch.ai uAgent (Research Agent)
+    UAGENT_SEED: str = "sherpa-research-agent-dev"
+    UAGENT_PORT: int = 8001
+    UAGENT_ENDPOINT: str = "http://localhost:8001/submit"
+    UAGENT_TIMEOUT: int = 45
 
     def allowed_origins(self) -> list[str]:
         """Parse ALLOWED_ORIGINS as JSON array or comma-separated string."""

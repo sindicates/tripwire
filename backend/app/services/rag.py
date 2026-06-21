@@ -168,6 +168,10 @@ class RAGService:
         )
         return [item.embedding for item in response.data]
 
+    async def embed_chunks(self, texts: list[str]) -> list[list[float]]:
+        """Embed list of texts."""
+        return await self._embed(texts)
+
     # ── Crawl-and-ingest ──────────────────────────────────────────────────────
 
     _POLICY_KEYWORDS = {
@@ -297,14 +301,46 @@ class RAGService:
 
         try:
             [q_emb] = await self._embed([query])
-            distance_col = DocChunk.embedding.cosine_distance(q_emb)
-            stmt = (
-                select(DocChunk, distance_col.label("distance"))
-                .where(DocChunk.school_id == school_id)
-                .order_by(distance_col)
-                .limit(top_k * 3)
-            )
-            rows = (await session.execute(stmt)).all()
+
+            is_sqlite = session.bind.dialect.name == "sqlite"
+            if is_sqlite:
+                # Fetch all chunks for this school
+                stmt = select(DocChunk).where(DocChunk.school_id == school_id)
+                chunks = (await session.execute(stmt)).scalars().all()
+
+                import numpy as np
+                def cosine_similarity(v1, v2):
+                    if v1 is None or v2 is None:
+                        return 0.0
+                    a1 = np.asarray(v1)
+                    a2 = np.asarray(v2)
+                    if a1.shape != a2.shape or a1.size == 0:
+                        return 0.0
+                    dot_product = np.dot(a1, a2)
+                    norm1 = np.linalg.norm(a1)
+                    norm2 = np.linalg.norm(a2)
+                    if norm1 == 0.0 or norm2 == 0.0:
+                        return 0.0
+                    return float(dot_product / (norm1 * norm2))
+
+                rows = []
+                for chunk in chunks:
+                    sim = cosine_similarity(chunk.embedding, q_emb)
+                    distance = 1.0 - sim
+                    rows.append((chunk, distance))
+
+                # Sort by distance and limit
+                rows.sort(key=lambda r: r[1])
+                rows = rows[:top_k * 3]
+            else:
+                distance_col = DocChunk.embedding.cosine_distance(q_emb)
+                stmt = (
+                    select(DocChunk, distance_col.label("distance"))
+                    .where(DocChunk.school_id == school_id)
+                    .order_by(distance_col)
+                    .limit(top_k * 3)
+                )
+                rows = (await session.execute(stmt)).all()
         except Exception:
             return []
 
@@ -344,6 +380,7 @@ class RAGService:
         school_id: uuid.UUID,
         school_name: str,
         session: AsyncSession,
+        risk_id: uuid.UUID | None = None,
     ) -> dict:
         """Return {answer, citations} grounded in retrieved policy chunks."""
         # 1. Check if there are any chunks for this school in DB first, to avoid
@@ -400,6 +437,28 @@ class RAGService:
             except Exception:
                 pass  # dynamic fetch is best-effort; fall back to pre-indexed chunks only
 
+            # Retrieve risk context if provided
+            risk_context_str = ""
+            if risk_id:
+                from app.models.risk_event import RiskEvent
+                result = await session.execute(
+                    select(RiskEvent).where(RiskEvent.id == risk_id)
+                )
+                event = result.scalar_one_or_none()
+                if event:
+                    packet = event.action_packet_json or {}
+                    risk_context_str = (
+                        f"Student Risk Context:\n"
+                        f"- Active Risk: {packet.get('title', event.risk_type)}\n"
+                        f"- Description: {packet.get('description', '')}\n"
+                        f"- Severity: {event.severity.value if hasattr(event.severity, 'value') else event.severity}\n"
+                        f"- Context Evidence: {json.dumps(event.context_json or {})}\n"
+                        f"- Suggested Action Steps:\n"
+                    )
+                    for action in packet.get("actions", []):
+                        risk_context_str += f"  * {action.get('label')} (Due: {action.get('deadline')}, Office: {action.get('office')})\n"
+                    risk_context_str += "\n"
+
             # Build context: pre-indexed chunks first, then live-fetched pages
             context_blocks = "\n\n".join(
                 f"[{i + 1}] {c['section_heading'] or '(no heading)'}\n"
@@ -433,9 +492,9 @@ class RAGService:
                 "append a JSON block at the very end — after all prose — fenced with ```json:\n"
                 "```json\n"
                 '{"title": "Short action title", "description": "One-sentence summary", '
-                '"actions": [{"label": "Step text", "url": "https://...", "deadline": "YYYY-MM-DD", "office": "Office name"}]}\n'
+                '"actions": [{"label": "Step text", "url": "URL from the policy excerpts above or null if not found", "deadline": "YYYY-MM-DD or null", "office": "Office name"}]}\n'
                 "```\n"
-                "All action fields except label are optional. Omit the block entirely for purely informational answers."
+                "All action fields except label are optional. For 'url': only use a URL that appears verbatim in the policy excerpts above — never invent or guess a URL. Set to null if no real URL is available. Omit the block entirely for purely informational answers."
             )
 
             msg = await self._get_anthropic().messages.create(
@@ -446,7 +505,7 @@ class RAGService:
                     {
                         "role": "user",
                         "content": (
-                            f"Policy excerpts:\n{context_blocks}\n\nQuestion: {query}"
+                            f"{risk_context_str}Policy excerpts:\n{context_blocks}\n\nQuestion: {query}"
                         ),
                     }
                 ],
@@ -507,6 +566,7 @@ class RAGService:
         school_id: uuid.UUID,
         school_name: str,
         session: AsyncSession,
+        risk_id: uuid.UUID | None = None,
     ) -> AsyncGenerator[dict, None]:
         """Yield SSE-compatible dicts: {type:'text', text} chunks then a final {type:'done'} payload."""
         _log = logging.getLogger("uvicorn")
@@ -563,6 +623,28 @@ class RAGService:
             except Exception:
                 pass
 
+            # Retrieve risk context if provided
+            risk_context_str = ""
+            if risk_id:
+                from app.models.risk_event import RiskEvent
+                result = await session.execute(
+                    select(RiskEvent).where(RiskEvent.id == risk_id)
+                )
+                event = result.scalar_one_or_none()
+                if event:
+                    packet = event.action_packet_json or {}
+                    risk_context_str = (
+                        f"Student Risk Context:\n"
+                        f"- Active Risk: {packet.get('title', event.risk_type)}\n"
+                        f"- Description: {packet.get('description', '')}\n"
+                        f"- Severity: {event.severity.value if hasattr(event.severity, 'value') else event.severity}\n"
+                        f"- Context Evidence: {json.dumps(event.context_json or {})}\n"
+                        f"- Suggested Action Steps:\n"
+                    )
+                    for action in packet.get("actions", []):
+                        risk_context_str += f"  * {action.get('label')} (Due: {action.get('deadline')}, Office: {action.get('office')})\n"
+                    risk_context_str += "\n"
+
             context_blocks = "\n\n".join(
                 f"[{i + 1}] {c['section_heading'] or '(no heading)'}\n{c['chunk_text']}\nSource: {c['page_url']}"
                 for i, c in enumerate(chunks)
@@ -593,9 +675,9 @@ class RAGService:
                 "append a JSON block at the very end — after all prose — fenced with ```json:\n"
                 "```json\n"
                 '{"title": "Short action title", "description": "One-sentence summary", '
-                '"actions": [{"label": "Step text", "url": "https://...", "deadline": "YYYY-MM-DD", "office": "Office name"}]}\n'
+                '"actions": [{"label": "Step text", "url": "URL from the policy excerpts above or null if not found", "deadline": "YYYY-MM-DD or null", "office": "Office name"}]}\n'
                 "```\n"
-                "All action fields except label are optional. Omit the block entirely for purely informational answers."
+                "All action fields except label are optional. For 'url': only use a URL that appears verbatim in the policy excerpts above — never invent or guess a URL. Set to null if no real URL is available. Omit the block entirely for purely informational answers."
             )
 
             full_text = ""
@@ -605,7 +687,7 @@ class RAGService:
                 system=system,
                 messages=[{
                     "role": "user",
-                    "content": f"Policy excerpts:\n{context_blocks}\n\nQuestion: {query}",
+                    "content": f"{risk_context_str}Policy excerpts:\n{context_blocks}\n\nQuestion: {query}",
                 }],
             ) as stream:
                 async for text in stream.text_stream:

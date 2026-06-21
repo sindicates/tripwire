@@ -79,9 +79,13 @@ async def resolve_risk_event(
 @router.post("/scan/{student_id}", response_model=list[dict[str, Any]])
 async def scan_student(
     student_id: uuid.UUID,
+    force: bool = False,
     db: AsyncSession = Depends(get_db),
 ) -> list[dict[str, Any]]:
-    """Run the risk engine for one student and persist any new risk events."""
+    """Run the risk engine for one student and persist any new risk events.
+
+    Pass ?force=true to bypass cooldowns and re-fire all active rules.
+    """
     exists = (await db.execute(
         select(Student.id).where(Student.id == student_id)
     )).scalar_one_or_none()
@@ -89,4 +93,4 @@ async def scan_student(
         raise HTTPException(status_code=404, detail="Student not found")
 
     engine = RiskEngine(db)
-    return await engine.scan_student(student_id)
+    return await engine.scan_student(student_id, force=force)

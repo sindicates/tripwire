@@ -110,7 +110,7 @@ DOCS: list[dict] = [
 
 async def ingest() -> None:
     async with AsyncSessionLocal() as db:
-        rag = RAGService(db)
+        rag = RAGService()
         now = datetime.now(timezone.utc)
 
         # Build school name → id map

@@ -215,8 +215,13 @@ async def list_alerts(
 
 @router.post("/{student_id}/scan", response_model=list[RiskEventOut])
 async def scan_student(
-    student_id: uuid.UUID, db: AsyncSession = Depends(get_db)
+    student_id: uuid.UUID,
+    force: bool = False,
+    db: AsyncSession = Depends(get_db),
 ) -> list[RiskEvent]:
-    """Manually trigger risk evaluation for one student."""
+    """Manually trigger risk evaluation for one student.
+
+    Pass ?force=true to bypass cooldowns and re-fire all active rules.
+    """
     engine = RiskEngine(db)
-    return await engine.scan_student(student_id)
+    return await engine.scan_student(student_id, force=force)

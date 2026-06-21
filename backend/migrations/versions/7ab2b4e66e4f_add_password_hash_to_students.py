@@ -19,7 +19,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.add_column("students", sa.Column("password_hash", sa.Text(), nullable=True))
+    op.execute("ALTER TABLE students ADD COLUMN IF NOT EXISTS password_hash TEXT")
 
 
 def downgrade() -> None:

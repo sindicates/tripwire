@@ -17,6 +17,7 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 class QueryRequest(BaseModel):
     school_id: uuid.UUID
     question: str
+    risk_id: uuid.UUID | None = None
 
 
 class Citation(BaseModel):
@@ -51,7 +52,7 @@ async def query(body: QueryRequest, db: AsyncSession = Depends(get_db)) -> dict:
     school = result.scalar_one_or_none()
     if school is None:
         raise HTTPException(status_code=404, detail="School not found")
-    return await rag_service.answer(body.question, body.school_id, school.name, db)
+    return await rag_service.answer(body.question, body.school_id, school.name, db, risk_id=body.risk_id)
 
 
 @router.post("/query/stream")
@@ -62,7 +63,7 @@ async def query_stream(body: QueryRequest, db: AsyncSession = Depends(get_db)) -
         raise HTTPException(status_code=404, detail="School not found")
 
     async def generate():
-        async for chunk in rag_service.stream_answer(body.question, body.school_id, school.name, db):
+        async for chunk in rag_service.stream_answer(body.question, body.school_id, school.name, db, risk_id=body.risk_id):
             yield f"data: {json_lib.dumps(chunk)}\n\n"
 
     return StreamingResponse(

@@ -85,36 +85,52 @@ function Sidebar({ onNavClick, onSignOut, profile }: { onNavClick: (id: NavId) =
   const subtitle = [profile.school, profile.year].filter(Boolean).join(" · ") || "—"
 
   return (
-    <aside className="tw-sidebar" style={{ width: 220, minWidth: 220, background: "#1e3824", borderRight: "1px solid #2a5636", display: "flex", flexDirection: "column", position: "sticky", top: 0, height: "100vh", overflowY: "auto", flexShrink: 0 }}>
-      <a href="/" className="tw-sidebar-logo" style={{ display: "flex", alignItems: "center", gap: 10, padding: "28px 20px 32px", textDecoration: "none" }}>
-        <SherpaLogo size={44} />
-        <span className="sidebar-brand tw-sidebar-logo-text">Sherpa</span>
-      </a>
-      <nav style={{ flex: 1, padding: "0 10px", display: "flex", flexDirection: "column", gap: 2 }}>
-        {NAV_ITEMS.map(({ id, Icon, label }) => (
-          <button
-            key={id}
-            className={`tw-nav-link${id === "advisor" ? " active" : ""}`}
-            onClick={() => onNavClick(id)}
-          >
-            <Icon size={15} strokeWidth={1.75} style={{ flexShrink: 0 }} />
-            <span className="tw-sidebar-label">{label}</span>
-          </button>
-        ))}
-      </nav>
-      <div className="tw-sidebar-user" style={{ padding: "16px 20px", borderTop: "1px solid #2a5636", display: "flex", flexDirection: "column", gap: 12 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ width: 34, height: 34, borderRadius: "50%", background: "linear-gradient(135deg, #b5b0a8, #2d6030)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Satoshi', sans-serif", fontWeight: 700, fontSize: 12, color: "#111e14", flexShrink: 0, letterSpacing: "0.03em" }}>
-            {initials}
-          </div>
-          <div className="tw-sidebar-user-text" style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: "#ffffff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</div>
-            <div style={{ fontSize: 11, color: "#9aafa0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{subtitle}</div>
+    <div className="tw-sidebar-wrapper">
+      <aside className="tw-sidebar">
+        <div className="tw-sidebar-content-wrapper">
+          <div style={{ width: 240, display: "flex", flexDirection: "column", minHeight: "100%", justifyContent: "space-between", flexShrink: 0 }}>
+            <div>
+              <a href="/" className="tw-sidebar-logo" style={{ display: "flex", alignItems: "center", gap: 10, padding: "28px 20px 32px", textDecoration: "none" }}>
+                <SherpaLogo size={44} />
+                <span className="sidebar-brand tw-sidebar-logo-text">Sherpa</span>
+              </a>
+              <nav style={{ padding: "0 10px", display: "flex", flexDirection: "column", gap: 2 }}>
+                {NAV_ITEMS.map(({ id, Icon, label }) => (
+                  <button
+                    key={id}
+                    className={`tw-nav-link${id === "advisor" ? " active" : ""}`}
+                    onClick={() => onNavClick(id)}
+                  >
+                    <Icon size={15} strokeWidth={1.75} style={{ flexShrink: 0 }} />
+                    <span className="tw-sidebar-label">{label}</span>
+                  </button>
+                ))}
+              </nav>
+            </div>
+            <div className="tw-sidebar-user" style={{ padding: "16px 20px", borderTop: "1px solid #2a5636", display: "flex", flexDirection: "column", gap: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ width: 34, height: 34, borderRadius: "50%", background: "linear-gradient(135deg, #b5b0a8, #2d6030)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Satoshi', sans-serif", fontWeight: 700, fontSize: 12, color: "#111e14", flexShrink: 0, letterSpacing: "0.03em" }}>
+                  {initials}
+                </div>
+                <div className="tw-sidebar-user-text" style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#ffffff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</div>
+                  <div style={{ fontSize: 11, color: "#9aafa0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{subtitle}</div>
+                </div>
+              </div>
+              <button className="tw-btn-ghost tw-sidebar-label" onClick={onSignOut} style={{ fontSize: 12, textAlign: "left", padding: "4px 0", color: "#9aafa0" }}>Sign out →</button>
+            </div>
           </div>
         </div>
-        <button className="tw-btn-ghost tw-sidebar-label" onClick={onSignOut} style={{ fontSize: 12, textAlign: "left", padding: "4px 0", color: "#9aafa0" }}>Sign out →</button>
-      </div>
-    </aside>
+
+        {/* Dynamic Indicators */}
+        <div className="tw-sidebar-indicator">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="m9 18 6-6-6-6"/>
+          </svg>
+        </div>
+        <div className="tw-sidebar-glow-strip" />
+      </aside>
+    </div>
   )
 }
 
@@ -126,6 +142,7 @@ export default function ChatPage() {
   const [loading,   setLoading]   = useState(false)
   const [schoolId,  setSchoolId]  = useState(DEMO_SCHOOL_ID)
   const [profile,   setProfile]   = useState<Profile>({ display_name: null, school: null, year: null })
+  const [riskId,    setRiskId]    = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef  = useRef<HTMLTextAreaElement>(null)
   const router    = useRouter()
@@ -159,10 +176,32 @@ export default function ChatPage() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
 
-  // Pre-fill from URL ?q= param (linked from dashboard FAB)
+  // Pre-fill from URL params (linked from dashboard FAB or action links)
   useEffect(() => {
-    const q = new URLSearchParams(window.location.search).get("q")
-    if (q) sendMessage(q)
+    const params = new URLSearchParams(window.location.search)
+    const q = params.get("q")
+    const rId = params.get("risk_id")
+
+    if (q) {
+      sendMessage(q)
+    } else if (rId) {
+      setRiskId(rId)
+      async function loadRisk() {
+        try {
+          const res = await fetch(`${API_BASE}/api/v1/risk-events/${rId}`)
+          if (res.ok) {
+            const data = await res.json()
+            const packet = data.action_packet_json
+            const title = packet?.title || data.risk_type.replace(/_/g, ' ').toUpperCase()
+            const desc = packet?.description || ''
+            const actions = packet?.actions || []
+            const greeting = `Hello! I've loaded your academic warning for **${title}**${desc ? ` (${desc})` : ''}.\n\nUnder your school's policy, here are the suggested action steps to resolve this:\n${actions.map((a: any, i: number) => `${i+1}. **${a.label}**${a.deadline ? ` (due ${a.deadline})` : ''}`).join('\n')}\n\nLet's work together to resolve this. How can I help you get started, or would you like to discuss the requirements?`
+            setMessages([{ id: genId(), role: "assistant", content: greeting }])
+          }
+        } catch { /* ignore and let user start empty */ }
+      }
+      loadRisk()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -193,7 +232,7 @@ export default function ChatPage() {
       const res = await fetch(`${API_BASE}/api/v1/chat/query`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ school_id: schoolId, question }),
+        body: JSON.stringify({ school_id: schoolId, question, risk_id: riskId }),
       })
       if (!res.ok) throw new Error(await res.text() || `HTTP ${res.status}`)
       const data = await res.json()
