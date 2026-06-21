@@ -30,7 +30,7 @@ export default function LoginPage() {
     setLoading(true)
 
     const supabase = createClient()
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
     if (error) {
       setError(error.message)
@@ -38,7 +38,15 @@ export default function LoginPage() {
       return
     }
 
-    router.push("/dashboard")
+    // Route new users to onboarding, returning users to dashboard
+    const { data: profile } = await supabase
+      .from("students")
+      .select("onboarding_complete")
+      .eq("user_id", data.user.id)
+      .single()
+
+    const dest = profile?.onboarding_complete ? "/dashboard" : "/onboarding"
+    router.push(dest)
     router.refresh()
   }
 
@@ -61,7 +69,7 @@ export default function LoginPage() {
           </svg>
         </div>
         <h1 className="text-3xl font-bold text-foreground">Welcome back</h1>
-        <p className="mt-2 text-muted-foreground">Sign in to your Tripwire account</p>
+        <p className="mt-2 text-muted-foreground">Sign in to your Sherpa account</p>
       </div>
 
       <div className="bg-white rounded-2xl border border-border shadow-sm p-8">
