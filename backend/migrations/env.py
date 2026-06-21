@@ -28,7 +28,7 @@ target_metadata = Base.metadata
 
 database_url = os.getenv(
     "DATABASE_URL",
-    "postgresql+asyncpg://postgres:postgres@localhost:5432/tripwire",
+    "sqlite+aiosqlite:///./tripwire.db",
 )
 
 

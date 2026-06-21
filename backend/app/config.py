@@ -10,7 +10,7 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/tripwire"
+    DATABASE_URL: str = "sqlite+aiosqlite:///./tripwire.db"
     REDIS_URL: str = "redis://localhost:6379/0"
 
     ANTHROPIC_API_KEY: str = ""

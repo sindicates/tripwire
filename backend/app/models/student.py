@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Any
 
 from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text, func
-from sqlalchemy.dialects.postgresql import JSON
+from sqlalchemy.types import JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -21,6 +21,10 @@ class Student(Base):
     enrollment_year: Mapped[int | None] = mapped_column(Integer, nullable=True)
     gpa: Mapped[float | None] = mapped_column(Float, nullable=True)
     credits_completed: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # credits_attempted = all credits ever enrolled in (passed, failed, or withdrawn).
+    # This is the correct denominator for the federal SAP pace calculation (34 CFR § 668.34).
+    # It is always >= credits_completed, and is distinct from credits_required (degree total).
+    credits_attempted: Mapped[int | None] = mapped_column(Integer, nullable=True)
     credits_required: Mapped[int | None] = mapped_column(Integer, nullable=True)
     aid_package_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     degree_audit_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
