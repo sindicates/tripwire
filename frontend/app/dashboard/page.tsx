@@ -219,7 +219,7 @@ export default function SherpaDashboard() {
   const activeEvents = riskEvents.filter(e => e.resolved_at === null).sort(sevSort)
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", background: "linear-gradient(180deg, #2e5a3c 0%, #c8d4d0 60%)", backgroundAttachment: "fixed", color: "#ffffff", fontFamily: "'Satoshi', sans-serif" }}>
+    <div style={{ display: "flex", minHeight: "100vh", background: "linear-gradient(180deg, #2e5a3c 0%, #8faaa4 60%)", backgroundAttachment: "fixed", color: "#ffffff", fontFamily: "'Satoshi', sans-serif" }}>
       <Sidebar activeNav={activeNav} onNavClick={handleNavClick} onSignOut={signOut} profile={profile} />
       <main className="tw-main-content" style={{ flex: 1, overflowY: "auto", padding: "36px 44px", minWidth: 0 }}>
         <DashboardHeader profile={profile} activeCount={activeEvents.length} onSignOut={signOut} />

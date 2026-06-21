@@ -222,7 +222,7 @@ export default function ChatPage() {
   }
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", background: "linear-gradient(180deg, #2e5a3c 0%, #c8d4d0 60%)", backgroundAttachment: "fixed", color: "#ffffff", fontFamily: "'Satoshi', sans-serif" }}>
+    <div style={{ display: "flex", minHeight: "100vh", background: "linear-gradient(180deg, #2e5a3c 0%, #8faaa4 60%)", backgroundAttachment: "fixed", color: "#ffffff", fontFamily: "'Satoshi', sans-serif" }}>
 
       <Sidebar onNavClick={handleNavClick} onSignOut={signOut} profile={profile} />
 
@@ -250,14 +250,7 @@ export default function ChatPage() {
         </div>
 
         {/* Input bar */}
-        <div style={{ padding: "16px 32px 24px", borderTop: "1px solid rgba(42,86,54,0.6)", background: "rgba(30,56,36,0.7)", backdropFilter: "blur(12px)", flexShrink: 0 }}>
-          {messages.length === 0 && (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12, maxWidth: 800, margin: "0 auto 12px" }}>
-              {SUGGESTED_QUESTIONS.slice(0, 3).map(q => (
-                <button key={q} className="tw-pill" onClick={() => sendMessage(q)} style={{ fontSize: 12 }}>{q}</button>
-              ))}
-            </div>
-          )}
+        <div style={{ padding: "12px 32px 16px", borderTop: "1px solid rgba(42,86,54,0.6)", background: "rgba(30,56,36,0.7)", backdropFilter: "blur(12px)", flexShrink: 0 }}>
           <div style={{ display: "flex", gap: 10, alignItems: "center", maxWidth: 800, margin: "0 auto" }}>
             <div style={{ flex: 1, position: "relative" }}>
               <textarea
@@ -303,9 +296,9 @@ export default function ChatPage() {
 
 function EmptyState({ questions, onSelect }: { questions: string[]; onSelect: (q: string) => void }) {
   return (
-    <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 32, padding: "40px 20px", animation: "fadeIn 0.4s ease" }}>
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 20, padding: "16px 20px", animation: "fadeIn 0.4s ease" }}>
       <div style={{ textAlign: "center" }}>
-        <div style={{ width: 64, height: 64, borderRadius: 8, background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.25)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px", backdropFilter: "blur(4px)" }}>
+        <div style={{ width: 56, height: 56, borderRadius: 8, background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.25)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px", backdropFilter: "blur(4px)" }}>
           <MessageSquare size={28} color="#ffffff" strokeWidth={1.5} />
         </div>
         <h2 style={{ fontFamily: "'Merriweather', serif", fontWeight: 700, fontSize: 22, margin: "0 0 10px", letterSpacing: "-0.3px", color: "#ffffff", textShadow: "0 1px 4px rgba(0,0,0,0.3)" }}>Ask me anything</h2>

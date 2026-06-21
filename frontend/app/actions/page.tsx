@@ -242,7 +242,7 @@ export default function ActionsPage() {
   const warnCount   = activeEvents.filter(e => e.severity === "warn").length
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", background: "linear-gradient(180deg, #2e5a3c 0%, #c8d4d0 60%)", backgroundAttachment: "fixed", color: "#ffffff", fontFamily: "'Satoshi', sans-serif" }}>
+    <div style={{ display: "flex", minHeight: "100vh", background: "linear-gradient(180deg, #2e5a3c 0%, #8faaa4 60%)", backgroundAttachment: "fixed", color: "#ffffff", fontFamily: "'Satoshi', sans-serif" }}>
 
       <Sidebar onNavClick={handleNavClick} onSignOut={signOut} profile={profile} />
 
