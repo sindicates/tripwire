@@ -41,7 +41,7 @@ const NAV_ITEMS: NavItem[] = [
 
 const RISK_CARDS: RiskCard[] = [
   {
-    id: 1, severity: "URGENT", borderColor: "#ff6b9d", badgeColor: "#ff6b9d", badgeText: "URGENT",
+    id: 1, severity: "URGENT", borderColor: "#ffadc8", badgeColor: "#ffadc8", badgeText: "URGENT",
     title: "FAFSA Renewal Window Opens in 14 Days",
     description: "Your FAFSA renewal deadline is approaching fast. Missing this window may pause your financial aid disbursement for the spring semester and require a manual reinstatement process.",
   },
@@ -58,9 +58,9 @@ const RISK_CARDS: RiskCard[] = [
 ]
 
 const ACTION_ITEMS: ActionItem[] = [
-  { id: 1, title: "Submit FAFSA renewal", meta: "Due Jan 1, 2027 · Financial Aid Office", tag: "URGENT", tagColor: "#ff6b9d" },
+  { id: 1, title: "Submit FAFSA renewal", meta: "Due Jan 1, 2027 · Financial Aid Office", tag: "URGENT", tagColor: "#ffadc8" },
   { id: 2, title: "Meet with advisor to adjust credit load", meta: "Schedule before Nov 15", tag: "IMPORTANT", tagColor: "#facc15" },
-  { id: 3, title: "Register for MATH 285 before section fills", meta: "18% seats remaining", tag: "TIME-SENSITIVE", tagColor: "#ff8fb1" },
+  { id: 3, title: "Register for MATH 285 before section fills", meta: "18% seats remaining", tag: "TIME-SENSITIVE", tagColor: "#ffc4d6" },
 ]
 
 const SUGGESTED_QUESTIONS = [
@@ -125,8 +125,8 @@ export default function TripwireDashboard() {
       <button
         className="tw-fab"
         aria-label="Open Policy Advisor"
-        onClick={() => router.push("/chat")}
-        style={{ position: "fixed", bottom: 32, right: 32, width: 58, height: 58, borderRadius: "50%", background: "linear-gradient(135deg, #ff6b9d, #ff8fb1)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, boxShadow: "0 4px 24px rgba(255, 107, 157, 0.4)", zIndex: 40 }}
+        onClick={() => { setAdvisorOpen(true); console.log("TODO: open advisor panel") }}
+        style={{ position: "fixed", bottom: 32, right: 32, width: 58, height: 58, borderRadius: "50%", background: "linear-gradient(135deg, #ffadc8, #ffc4d6)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, boxShadow: "0 4px 24px rgba(255, 173, 200, 0.4)", zIndex: 40 }}
       >💬</button>
     </div>
   )
@@ -135,16 +135,17 @@ export default function TripwireDashboard() {
 // ── Sidebar ──────────────────────────────────────────────────────────────────
 
 function Sidebar({ activeNav, onNavClick, onSignOut, profile }: { activeNav: NavId; onNavClick: (id: NavId) => void; onSignOut: () => void; profile: Profile }) {
+  const router = useRouter()
   const name = profile.display_name || "You"
   const initials = name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()
   const subtitle = [profile.school, profile.year].filter(Boolean).join(" · ") || "Tripwire"
 
   return (
     <aside className="tw-sidebar" style={{ width: 220, minWidth: 220, background: "#0d1f13", borderRight: "1px solid #1e3d28", display: "flex", flexDirection: "column", position: "sticky", top: 0, height: "100vh", overflowY: "auto", flexShrink: 0 }}>
-      <div className="tw-sidebar-logo" style={{ display: "flex", alignItems: "center", gap: 8, padding: "28px 20px 32px" }}>
+      <button onClick={() => router.push("/")} className="tw-sidebar-logo" style={{ display: "flex", alignItems: "center", gap: 8, padding: "28px 20px 32px", background: "none", border: "none", cursor: "pointer" }}>
         <span style={{ fontSize: 22, flexShrink: 0 }}>⚡</span>
-        <span className="tw-sidebar-logo-text" style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 22, color: "#ff6b9d", letterSpacing: "-0.5px" }}>Tripwire</span>
-      </div>
+        <span className="tw-sidebar-logo-text" style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 22, color: "#ffadc8", letterSpacing: "-0.5px" }}>Tripwire</span>
+      </button>
 
       <nav style={{ flex: 1, padding: "0 10px", display: "flex", flexDirection: "column", gap: 2 }}>
         {NAV_ITEMS.map((item) => (
@@ -157,7 +158,7 @@ function Sidebar({ activeNav, onNavClick, onSignOut, profile }: { activeNav: Nav
 
       <div className="tw-sidebar-user" style={{ padding: "16px 20px", borderTop: "1px solid #1e3d28", display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ width: 36, height: 36, borderRadius: "50%", background: "linear-gradient(135deg, #ff6b9d, #ff8fb1)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 13, color: "#fff", flexShrink: 0 }}>{initials}</div>
+          <div style={{ width: 36, height: 36, borderRadius: "50%", background: "linear-gradient(135deg, #ffadc8, #ffc4d6)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 13, color: "#fff", flexShrink: 0 }}>{initials}</div>
           <div className="tw-sidebar-user-text" style={{ minWidth: 0 }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: "#ffffff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</div>
             <div style={{ fontSize: 11, color: "#a3c4a8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{subtitle}</div>
@@ -181,14 +182,14 @@ function DashboardHeader({ onSignOut, profile }: { onSignOut: () => void; profil
       <div>
         <h1 style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 30, margin: 0, letterSpacing: "-0.5px", lineHeight: 1.2 }}>{greeting}{firstName ? `, ${firstName}` : ""} 👋</h1>
         <p style={{ color: "#a3c4a8", margin: "8px 0 0", fontSize: 15, display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "#ff6b9d", boxShadow: "0 0 6px #ff6b9d" }} />
+          <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "#ffadc8", boxShadow: "0 0 6px #ffadc8" }} />
           3 risks need your attention
         </p>
       </div>
       <button
         onClick={onSignOut}
         style={{ background: "none", border: "1px solid #1e3d28", borderRadius: 8, padding: "8px 14px", color: "#a3c4a8", fontSize: 13, cursor: "pointer", transition: "border-color 0.15s ease, color 0.15s ease", whiteSpace: "nowrap", flexShrink: 0 }}
-        onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#ff6b9d"; e.currentTarget.style.color = "#ff6b9d" }}
+        onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#ffadc8"; e.currentTarget.style.color = "#ffadc8" }}
         onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#1e3d28"; e.currentTarget.style.color = "#a3c4a8" }}
       >Sign out</button>
     </div>
@@ -225,18 +226,18 @@ function StatCards() {
           <div>
             <div style={{ fontSize: 11, color: "#a3c4a8", textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 600, marginBottom: 6 }}>Credits Completed</div>
             <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 40, lineHeight: 1 }}>
-              <span style={{ color: "#ff6b9d" }}>67</span>
+              <span style={{ color: "#ffadc8" }}>67</span>
               <span style={{ color: "#a3c4a8", fontSize: 22, fontWeight: 500 }}> / 120</span>
             </div>
           </div>
-          <span style={{ background: "rgba(255, 107, 157, 0.12)", color: "#ff6b9d", fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 20, border: "1px solid rgba(255, 107, 157, 0.25)" }}>56%</span>
+          <span style={{ background: "rgba(255, 173, 200, 0.12)", color: "#ffadc8", fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 20, border: "1px solid rgba(255, 173, 200, 0.25)" }}>56%</span>
         </div>
         <div style={{ marginTop: 18 }}>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#a3c4a8", marginBottom: 6 }}>
             <span>Progress to degree</span><span>53 remaining</span>
           </div>
           <div style={{ background: "#1e3d28", borderRadius: 4, height: 6, overflow: "hidden" }}>
-            <div style={{ background: "linear-gradient(90deg, #ff6b9d, #ff8fb1)", width: "56%", height: "100%", borderRadius: 4 }} />
+            <div style={{ background: "linear-gradient(90deg, #ffadc8, #ffc4d6)", width: "56%", height: "100%", borderRadius: 4 }} />
           </div>
         </div>
       </div>
@@ -273,7 +274,7 @@ function RiskFeed() {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 18, margin: 0 }}>Risk Feed</h2>
-          <span style={{ background: "rgba(255, 107, 157, 0.15)", color: "#ff6b9d", fontSize: 11, fontWeight: 700, padding: "2px 10px", borderRadius: 20, border: "1px solid rgba(255, 107, 157, 0.3)" }}>3 active</span>
+          <span style={{ background: "rgba(255, 173, 200, 0.15)", color: "#ffadc8", fontSize: 11, fontWeight: 700, padding: "2px 10px", borderRadius: 20, border: "1px solid rgba(255, 173, 200, 0.3)" }}>3 active</span>
         </div>
         <button className="tw-btn-ghost" onClick={() => console.log("TODO: view all risks")}>View all →</button>
       </div>
@@ -322,7 +323,7 @@ function ActionCenter() {
           const done = checked.has(item.id)
           return (
             <div key={item.id} className="tw-card" style={{ borderRadius: 12, padding: "16px 20px", display: "flex", alignItems: "center", gap: 14, opacity: done ? 0.6 : 1, transition: "opacity 0.2s ease" }}>
-              <input type="checkbox" checked={done} onChange={() => toggle(item.id)} style={{ width: 18, height: 18, accentColor: "#ff6b9d", cursor: "pointer", flexShrink: 0 }} />
+              <input type="checkbox" checked={done} onChange={() => toggle(item.id)} style={{ width: 18, height: 18, accentColor: "#ffadc8", cursor: "pointer", flexShrink: 0 }} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 14, fontWeight: 500, color: done ? "#a3c4a8" : "#ffffff", textDecoration: done ? "line-through" : "none", marginBottom: 4 }}>{item.title}</div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -367,7 +368,7 @@ function AdvisorPanel({ open, onClose }: { open: boolean; onClose: () => void })
       </div>
       <div style={{ flex: 1, padding: "20px 24px", overflowY: "auto", display: "flex", alignItems: "center", justifyContent: "center" }}>
         <div style={{ textAlign: "center", color: "#a3c4a8" }}>
-          <div style={{ width: 56, height: 56, borderRadius: "50%", background: "rgba(255, 107, 157, 0.1)", border: "1px solid rgba(255, 107, 157, 0.2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26, margin: "0 auto 14px" }}>🎓</div>
+          <div style={{ width: 56, height: 56, borderRadius: "50%", background: "rgba(255, 173, 200, 0.1)", border: "1px solid rgba(255, 173, 200, 0.2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26, margin: "0 auto 14px" }}>🎓</div>
           <div style={{ fontSize: 14, fontWeight: 500, color: "#ffffff", marginBottom: 6 }}>Ask me anything</div>
           <div style={{ fontSize: 13, lineHeight: 1.6 }}>I can help with UNR&apos;s academic policies,<br />financial aid rules, and registration info.</div>
         </div>
