@@ -58,21 +58,29 @@ export default function LandingPage() {
         </Link>
 
         <div style={{ display: 'flex', gap: '28px' }}>
-          {([['Why Sherpa', '#why-sherpa'], ['How It Works', '#how-it-works']] as const).map(([label, href]) => (
-            <a
+          {([['About', 'why-sherpa'], ['How it works', 'how-it-works']] as const).map(([label, id]) => (
+            <button
               key={label}
-              href={href}
+              onClick={() => {
+                const el = document.getElementById(id)
+                if (!el) return
+                const top = el.getBoundingClientRect().top + window.scrollY - 58
+                window.scrollTo({ top, behavior: 'smooth' })
+              }}
               style={{
+                background: 'none',
+                border: 'none',
                 fontFamily: 'Satoshi, sans-serif',
                 fontWeight: 400,
                 fontSize: '14px',
                 color: 'rgba(255,255,255,0.6)',
-                textDecoration: 'none',
+                cursor: 'pointer',
+                padding: 0,
                 transition: 'color 0.15s',
               }}
               onMouseEnter={(e) => (e.currentTarget.style.color = '#fff')}
               onMouseLeave={(e) => (e.currentTarget.style.color = 'rgba(255,255,255,0.6)')}
-            >{label}</a>
+            >{label}</button>
           ))}
         </div>
 
@@ -314,7 +322,7 @@ export default function LandingPage() {
             textTransform: 'uppercase',
             letterSpacing: '0.6px',
           }}>
-            Why Sherpa
+            Why it matters
           </p>
 
           <h2 className="reveal stagger-1" style={{
@@ -326,7 +334,7 @@ export default function LandingPage() {
             lineHeight: 1.28,
             margin: '0 0 20px',
           }}>
-            Most students don&apos;t lose aid because they stopped trying.
+            Nobody is watching your aid status for you.
           </h2>
 
           <p className="reveal stagger-2" style={{
@@ -338,7 +346,7 @@ export default function LandingPage() {
             lineHeight: 1.75,
             margin: '0 0 32px',
           }}>
-            They lose it because nobody told them the deadline was two weeks away, or the credit math wasn&apos;t adding up. Advising offices are overbooked, school portals bury the information, and no one is watching your trajectory in real time. Sherpa does.
+            Financial aid has a lot of moving parts — SAP reviews, FAFSA renewal windows, credit minimums, add/drop deadlines. Advisors are stretched thin and school portals aren&apos;t built to warn you in advance. Sherpa fills that gap. It monitors the things that affect your enrollment and funding, and tells you what to do while you still have time to do it.
           </p>
 
           {/* Quote block */}
@@ -358,7 +366,7 @@ export default function LandingPage() {
               lineHeight: 1.7,
               margin: '0 0 10px',
             }}>
-              &ldquo;I didn&apos;t know my SAP status had slipped until my aid was already paused. By then it was too late to appeal for that semester.&rdquo;
+              &ldquo;I didn&apos;t find out my aid was on hold until I tried to register for spring. I had no idea my completion rate had dropped below the threshold.&rdquo;
             </p>
             <p style={{
               fontFamily: 'Satoshi, sans-serif',
@@ -367,7 +375,7 @@ export default function LandingPage() {
               color: '#6b7280',
               margin: 0,
             }}>
-              — First-gen student, community college, 2024
+              — Community college student, 2024
             </p>
           </blockquote>
 
@@ -382,24 +390,24 @@ export default function LandingPage() {
               iconBg="#dcfce7"
               iconColor="#1ba84e"
               Icon={AlertTriangle}
-              title="Risk detection before it's too late"
-              desc="GPA drops, SAP failures, FAFSA windows — flagged weeks ahead with clear urgency levels."
+              title="Early warnings, not last-minute alerts"
+              desc="You'll know about GPA risks, SAP reviews, and FAFSA deadlines weeks in advance — not the day before."
               delayClass="stagger-1"
             />
             <FeatureCard
               iconBg="#f3f4f6"
               iconColor="#9aafa0"
               Icon={FileText}
-              title="Grounded in your school's actual rules"
-              desc="Every alert cites official financial aid and registrar documents. No guessing."
+              title="Based on your school's actual policies"
+              desc="Alerts are built from your school's own financial aid and registrar documents, not general guidance."
               delayClass="stagger-2"
             />
             <FeatureCard
               iconBg="#f0fdf4"
               iconColor="#1e3824"
               Icon={ListChecks}
-              title="Exact next steps, not vague suggestions"
-              desc='Each risk comes with the specific form, deadline, and office — not "contact your advisor."'
+              title="Specific enough to act on"
+              desc="Every alert tells you the form, the office, and the deadline. You don't have to figure out the next step yourself."
               delayClass="stagger-3"
             />
           </div>
@@ -412,9 +420,9 @@ export default function LandingPage() {
             gridTemplateColumns: 'repeat(3, 1fr)',
           }}>
             {[
-              { num: '$3.7B', label: 'in Pell Grant aid goes unclaimed each year', border: true },
-              { num: '40%', label: "of first-gen students don't finish their degree", border: true },
-              { num: '1 in 4', label: 'students lose aid for missing a single deadline', border: false },
+              { num: '$3.7B', label: "in federal aid goes unclaimed each year, largely because students missed a filing window or didn't know they qualified.", border: true },
+              { num: '40%', label: "of first-generation students don't complete their degree.", border: true },
+              { num: '1 in 4', label: 'students have lost aid due to a missed deadline or paperwork gap.', border: false },
             ].map(({ num, label, border }) => (
               <div key={num} style={{
                 padding: '28px 32px',
@@ -427,6 +435,7 @@ export default function LandingPage() {
                   fontSize: '34px',
                   color: '#b5b0a8',
                   margin: '0 0 6px',
+                  whiteSpace: 'nowrap',
                 }}>{num}</p>
                 <p style={{
                   fontFamily: 'Satoshi, sans-serif',
@@ -471,7 +480,7 @@ export default function LandingPage() {
             lineHeight: 1.28,
             margin: '0 0 32px',
           }}>
-            Set up in minutes. Monitors you all semester.
+            Set it up once. Runs on its own after that.
           </h2>
 
           <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -479,28 +488,28 @@ export default function LandingPage() {
               {
                 n: '1',
                 title: 'Connect your school',
-                desc: 'Search 6,000+ institutions. Sherpa ingests your financial aid, registrar, and advising documents.',
+                desc: 'Search from over 6,000 institutions. Sherpa pulls in the relevant policies from your financial aid and registrar offices.',
                 delay: 'stagger-1',
                 last: false,
               },
               {
                 n: '2',
-                title: 'Enter your academic profile',
-                desc: 'GPA, credits, aid package, and graduation target. Upload your degree audit for full trajectory analysis.',
+                title: 'Enter your academic details',
+                desc: 'Your GPA, credits, aid package, and graduation goal. You can also upload your degree audit for more precise tracking.',
                 delay: 'stagger-2',
                 last: false,
               },
               {
                 n: '3',
-                title: 'Get alerts before risks become problems',
-                desc: 'Nightly scans surface risks with exact action steps — the form, the deadline, the office.',
+                title: 'Stay informed automatically',
+                desc: 'Sherpa checks your status each night. If something needs attention, you get a clear alert — including the specific form, deadline, and where to submit it.',
                 delay: 'stagger-3',
                 last: false,
               },
               {
                 n: '4',
-                title: 'Ask your policy advisor anything',
-                desc: '"Can I drop this class without losing aid?" Answers grounded in your school\'s actual rules.',
+                title: 'Get answers when you have questions',
+                desc: "Ask anything about your school's policies in plain language.",
                 delay: 'stagger-4',
                 last: true,
               },
