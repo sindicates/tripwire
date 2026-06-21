@@ -207,8 +207,12 @@ class RAGService:
         session: AsyncSession,
     ) -> dict:
         """Return {answer, citations} grounded in retrieved policy chunks."""
-        chunks = await self.search(query, school_id, session)
-        if not chunks:
+        # 1. Check if there are any chunks for this school in DB first, to avoid
+        # unnecessary OpenAI embedding API calls if no docs are ingested.
+        chunks_exist_result = await session.execute(
+            select(DocChunk.id).where(DocChunk.school_id == school_id).limit(1)
+        )
+        if not chunks_exist_result.scalar():
             return {
                 "answer": (
                     "No policy documents have been ingested for this school yet. "
@@ -217,49 +221,71 @@ class RAGService:
                 "citations": [],
             }
 
-        context_blocks = "\n\n".join(
-            f"[{i + 1}] {c['section_heading'] or '(no heading)'}\n"
-            f"{c['chunk_text']}\n"
-            f"Source: {c['page_url']}"
-            for i, c in enumerate(chunks)
-        )
-
-        system = (
-            f"You are an academic policy assistant for {school_name}. "
-            "Answer the student's question using ONLY the policy excerpts provided. "
-            "Be specific and plain-language — no filler, no generic advice. "
-            "If the excerpts do not contain a clear answer, say so explicitly. "
-            "End your response with a 'Sources:' line listing the [n] numbers you cited."
-        )
-
-        msg = await self._anthropic.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=1024,
-            system=system,
-            messages=[
-                {
-                    "role": "user",
-                    "content": (
-                        f"Policy excerpts:\n{context_blocks}\n\nQuestion: {query}"
+        # 2. Search and generate answer, catching any external API quota/auth errors gracefully.
+        try:
+            chunks = await self.search(query, school_id, session)
+            if not chunks:
+                return {
+                    "answer": (
+                        "No policy documents have been ingested for this school yet. "
+                        "Ask an admin to submit a policy URL first."
                     ),
+                    "citations": [],
                 }
-            ],
-        )
 
-        return {
-            "answer": msg.content[0].text,
-            "citations": [
-                {
-                    "n": i + 1,
-                    "heading": c["section_heading"],
-                    "url": c["page_url"],
-                    "fetched_at": (
-                        c["fetched_at"].isoformat() if c["fetched_at"] else None
-                    ),
-                }
+            context_blocks = "\n\n".join(
+                f"[{i + 1}] {c['section_heading'] or '(no heading)'}\n"
+                f"{c['chunk_text']}\n"
+                f"Source: {c['page_url']}"
                 for i, c in enumerate(chunks)
-            ],
-        }
+            )
+
+            system = (
+                f"You are an academic policy assistant for {school_name}. "
+                "Answer the student's question using ONLY the policy excerpts provided. "
+                "Be specific and plain-language — no filler, no generic advice. "
+                "If the excerpts do not contain a clear answer, say so explicitly. "
+                "End your response with a 'Sources:' line listing the [n] numbers you cited."
+            )
+
+            msg = await self._anthropic.messages.create(
+                model="claude-sonnet-4-6",
+                max_tokens=1024,
+                system=system,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": (
+                            f"Policy excerpts:\n{context_blocks}\n\nQuestion: {query}"
+                        ),
+                    }
+                ],
+            )
+            
+            return {
+                "answer": msg.content[0].text,
+                "citations": [
+                    {
+                        "n": i + 1,
+                        "heading": c["section_heading"],
+                        "url": c["page_url"],
+                        "fetched_at": (
+                            c["fetched_at"].isoformat() if c["fetched_at"] else None
+                        ),
+                    }
+                    for i, c in enumerate(chunks)
+                ],
+            }
+        except Exception as e:
+            import logging
+            logging.getLogger("uvicorn").error(f"RAG service error: {e}")
+            return {
+                "answer": (
+                    "The academic policy database is temporarily offline or the API quota has been exceeded. "
+                    "Please try again later."
+                ),
+                "citations": [],
+            }
 
 
 rag_service = RAGService()

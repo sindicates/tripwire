@@ -73,7 +73,6 @@ const SUGGESTED_QUESTIONS = [
 
 export default function TripwireDashboard() {
   const [activeNav, setActiveNav] = useState<NavId>("dashboard")
-  const [advisorOpen, setAdvisorOpen] = useState(false)
   const router = useRouter()
 
   async function signOut() {
@@ -85,8 +84,8 @@ export default function TripwireDashboard() {
 
   const handleNavClick = (id: NavId) => {
     setActiveNav(id)
-    if (id === "advisor") setAdvisorOpen(true)
-    console.log(`TODO: navigate to ${id}`)
+    if (id === "advisor") router.push("/chat")
+    else if (id === "actions") router.push("/actions")
   }
 
   return (
@@ -103,14 +102,9 @@ export default function TripwireDashboard() {
       <button
         className="tw-fab"
         aria-label="Open Policy Advisor"
-        onClick={() => { setAdvisorOpen(true); console.log("TODO: open advisor panel") }}
+        onClick={() => router.push("/chat")}
         style={{ position: "fixed", bottom: 32, right: 32, width: 58, height: 58, borderRadius: "50%", background: "linear-gradient(135deg, #ff6b9d, #ff8fb1)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, boxShadow: "0 4px 24px rgba(255, 107, 157, 0.4)", zIndex: 40 }}
       >💬</button>
-
-      {advisorOpen && (
-        <div onClick={() => setAdvisorOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 49, backdropFilter: "blur(2px)" }} />
-      )}
-      <AdvisorPanel open={advisorOpen} onClose={() => setAdvisorOpen(false)} />
     </div>
   )
 }

@@ -207,3 +207,28 @@ cd mobile && npx expo start                                     # Expo Go / simu
 - `backend/app/routers/students.py` — `/me` (auth-gated), `/{id}`, `/{id}/risk-events`, `/{id}/alerts`, `/{id}/scan`
 - `backend/app/routers/risk_events.py` — list (filterable by student + severity), get, resolve
 - `backend/app/routers/alerts.py` — list, dispatch (record-only, no email/SMS yet), get, mark-opened
+
+---
+
+### Chat Page + Action Center (2026-06-21)
+
+**What it does:** Implements the two remaining stub pages as full, production-quality UIs wired to the live backend.
+
+**Chat page** (`frontend/app/chat/page.tsx`):
+- Full RAG-grounded Q&A interface. Sends `POST /api/v1/chat/query` with `school_id` + `question`; renders the answer with a `Citations` block (source URL, heading, fetched date).
+- Animated message bubbles (user = pink gradient pill, assistant = card with thinking dots).
+- Suggested questions grid on empty state. `Enter` to send, `Shift+Enter` for newline.
+- Error state surfaced inline (no page crash).
+
+**Action Center page** (`frontend/app/actions/page.tsx`):
+- Fetches `GET /api/v1/risk-events/?student_id=<id>` on mount; auto-sorted by severity (urgent → warn → info).
+- Severity filter bar; "Resolve" calls `PUT /api/v1/risk-events/<id>/resolve` with optimistic UI update.
+- "Action Steps" expands `action_packet_json` inline: numbered steps, deadline badge, office label, direct URL button.
+- Loading skeleton, empty state, resolved events collapsible section.
+
+**Dashboard routing** (`frontend/app/dashboard/page.tsx`):
+- Sidebar "Ask Advisor" and "Action Center" links now `router.push` to real pages instead of `console.log TODO`.
+- Floating 💬 FAB routes to `/chat`. Removed now-unused `advisorOpen` state and `AdvisorPanel`.
+
+**No new DB migrations or env vars required.**
+
