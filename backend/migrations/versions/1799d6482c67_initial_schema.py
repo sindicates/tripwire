@@ -44,7 +44,7 @@ def upgrade() -> None:
     op.create_table('students',
     sa.Column('id', sa.Uuid(), nullable=False),
     sa.Column('email', sa.String(), nullable=False),
-    sa.Column('school_id', sa.Uuid(), nullable=False),
+    sa.Column('school_id', sa.Uuid(), nullable=True),
     sa.Column('major', sa.String(), nullable=True),
     sa.Column('enrollment_year', sa.Integer(), nullable=True),
     sa.Column('gpa', sa.Float(), nullable=True),

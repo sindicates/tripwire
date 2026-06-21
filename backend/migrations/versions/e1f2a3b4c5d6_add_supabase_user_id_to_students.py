@@ -18,12 +18,9 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     op.add_column("students", sa.Column("supabase_user_id", sa.String(), nullable=True))
-    op.create_unique_constraint("uq_students_supabase_user_id", "students", ["supabase_user_id"])
-    # Allow students synced from Supabase to not yet have a matched school row
-    op.alter_column("students", "school_id", existing_type=sa.UUID(), nullable=True)
+    op.execute("CREATE UNIQUE INDEX IF NOT EXISTS ix_students_supabase_user_id ON students (supabase_user_id)")
 
 
 def downgrade() -> None:
-    op.alter_column("students", "school_id", existing_type=sa.UUID(), nullable=False)
-    op.drop_constraint("uq_students_supabase_user_id", "students", type_="unique")
+    op.execute("DROP INDEX IF EXISTS ix_students_supabase_user_id")
     op.drop_column("students", "supabase_user_id")

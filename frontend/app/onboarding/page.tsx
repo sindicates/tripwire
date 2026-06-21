@@ -20,15 +20,6 @@ const HOUSING_OPTIONS = [
   "Off-Campus Apartment",
   "Commuter",
 ] as const
-const GPA_RANGES = [
-  "3.7–4.0",
-  "3.3–3.7",
-  "3.0–3.3",
-  "2.7–3.0",
-  "2.3–2.7",
-  "Below 2.3",
-] as const
-
 const EMPTY_FORM = {
   display_name: "",
   school: "",
@@ -39,7 +30,7 @@ const EMPTY_FORM = {
   financial_aid_status: "",
   work_hours_per_week: "",
   housing_status: "",
-  gpa_range: "",
+  gpa: "",
   graduation_goal: "",
   unmet_financial_need: "",
 }
@@ -92,7 +83,7 @@ export default function OnboardingPage() {
             financial_aid_status: data.financial_aid_status ?? "",
             work_hours_per_week: data.work_hours_per_week?.toString() ?? "",
             housing_status: data.housing_status ?? "",
-            gpa_range: data.gpa_range ?? "",
+            gpa: data.gpa?.toString() ?? "",
             graduation_goal: data.graduation_goal ?? "",
             unmet_financial_need: data.unmet_financial_need?.toString() ?? "",
           })
@@ -137,7 +128,7 @@ export default function OnboardingPage() {
       financial_aid_status: form.financial_aid_status || null,
       work_hours_per_week: form.work_hours_per_week ? parseInt(form.work_hours_per_week) : null,
       housing_status: form.housing_status || null,
-      gpa_range: form.gpa_range || null,
+      gpa: form.gpa ? parseFloat(form.gpa) : null,
       graduation_goal: form.graduation_goal || null,
       unmet_financial_need: form.unmet_financial_need ? parseInt(form.unmet_financial_need) : null,
       onboarding_complete: true,
@@ -219,11 +210,8 @@ export default function OnboardingPage() {
             </Field>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              <Field label="GPA range">
-                <select value={form.gpa_range} onChange={set("gpa_range")} className={selectClass}>
-                  <option value="">Select range</option>
-                  {GPA_RANGES.map((g) => <option key={g} value={g}>{g}</option>)}
-                </select>
+              <Field label="GPA">
+                <input type="number" min={0} max={4} step={0.01} value={form.gpa} onChange={set("gpa")} className={inputClass} placeholder="e.g. 3.45" />
               </Field>
               <Field label="Financial aid status">
                 <select value={form.financial_aid_status} onChange={set("financial_aid_status")} className={selectClass}>
