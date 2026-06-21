@@ -2,9 +2,12 @@
 
 import { useEffect } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { AlertTriangle, FileText, ListChecks, LucideIcon } from 'lucide-react'
 
 export default function LandingPage() {
+  const router = useRouter()
+
   useEffect(() => {
     const els = document.querySelectorAll('.reveal, .reveal-left, .reveal-scale')
     const observer = new IntersectionObserver(
@@ -26,7 +29,7 @@ export default function LandingPage() {
     <>
       {/* ── NAVBAR ── */}
       <nav style={{
-        background: '#0d5c2e',
+        background: '#117a3d',
         height: '54px',
         display: 'flex',
         alignItems: 'center',
@@ -60,7 +63,7 @@ export default function LandingPage() {
         </div>
 
         <button
-          onClick={() => console.log('TODO: navigate-to-signin')}
+          onClick={() => router.push('/login')}
           style={{
             background: 'transparent',
             border: '1.5px solid rgba(255,255,255,0.4)',
@@ -90,7 +93,7 @@ export default function LandingPage() {
         <div style={{
           position: 'absolute',
           inset: 0,
-          background: 'linear-gradient(180deg, #0d5c2e 0%, #13733a 22%, #1a8545 38%, rgba(22,105,56,0.4) 58%, rgba(249,250,251,0.88) 80%, #f9fafb 100%)',
+          background: 'linear-gradient(180deg, #117a3d 0%, #1a9649 22%, #21a659 38%, rgba(22,105,56,0.4) 58%, rgba(249,250,251,0.88) 80%, #f9fafb 100%)',
         }} />
 
         {/* SVG data visualization */}
@@ -100,9 +103,9 @@ export default function LandingPage() {
           preserveAspectRatio="xMidYMid slice"
           xmlns="http://www.w3.org/2000/svg"
         >
-          <ellipse cx="200" cy="480" rx="280" ry="50" fill="#0a4020" opacity="0.5" />
-          <ellipse cx="700" cy="490" rx="400" ry="60" fill="#083518" opacity="0.4" />
-          <ellipse cx="1100" cy="475" rx="220" ry="40" fill="#0d5c2e" opacity="0.35" />
+          <ellipse cx="200" cy="480" rx="280" ry="50" fill="#0e562c" opacity="0.5" />
+          <ellipse cx="700" cy="490" rx="400" ry="60" fill="#0c4a23" opacity="0.4" />
+          <ellipse cx="1100" cy="475" rx="220" ry="40" fill="#117a3d" opacity="0.35" />
 
           <polyline
             points="80,430 350,300 600,190 850,110 1100,55"
@@ -200,7 +203,7 @@ export default function LandingPage() {
 
           <div style={{ display: 'flex', gap: '9px', animation: 'fadeUp 0.65s cubic-bezier(0.22,1,0.36,1) 0.42s both' }}>
             <button
-              onClick={() => console.log('TODO: navigate-to-signup')}
+              onClick={() => router.push('/register')}
               style={{
                 background: '#f9a8d4',
                 color: '#fff',
@@ -271,7 +274,7 @@ export default function LandingPage() {
             fontFamily: 'Merriweather, serif',
             fontWeight: 700,
             fontSize: '22px',
-            color: '#0d5c2e',
+            color: '#117a3d',
             maxWidth: '500px',
             lineHeight: 1.28,
             margin: '0 0 20px',
@@ -294,7 +297,7 @@ export default function LandingPage() {
           {/* Quote block */}
           <blockquote className="reveal stagger-2" style={{
             background: '#f0fdf4',
-            borderLeft: '3px solid #0d5c2e',
+            borderLeft: '3px solid #117a3d',
             borderRadius: '0 4px 4px 0',
             padding: '18px 20px',
             margin: '0 0 32px',
@@ -304,7 +307,7 @@ export default function LandingPage() {
               fontWeight: 400,
               fontStyle: 'italic',
               fontSize: '14px',
-              color: '#0d5c2e',
+              color: '#117a3d',
               lineHeight: 1.7,
               margin: '0 0 10px',
             }}>
@@ -330,7 +333,7 @@ export default function LandingPage() {
           }}>
             <FeatureCard
               iconBg="#dcfce7"
-              iconColor="#15803d"
+              iconColor="#1ba84e"
               Icon={AlertTriangle}
               title="Risk detection before it's too late"
               desc="GPA drops, SAP failures, FAFSA windows — flagged weeks ahead with clear urgency levels."
@@ -346,7 +349,7 @@ export default function LandingPage() {
             />
             <FeatureCard
               iconBg="#f0fdf4"
-              iconColor="#0d5c2e"
+              iconColor="#117a3d"
               Icon={ListChecks}
               title="Exact next steps, not vague suggestions"
               desc='Each risk comes with the specific form, deadline, and office — not "contact your advisor."'
@@ -356,7 +359,7 @@ export default function LandingPage() {
 
           {/* Stats strip */}
           <div className="reveal-scale" style={{
-            background: '#0d5c2e',
+            background: '#117a3d',
             borderRadius: '4px',
             display: 'grid',
             gridTemplateColumns: 'repeat(3, 1fr)',
@@ -417,7 +420,7 @@ export default function LandingPage() {
             fontFamily: 'Merriweather, serif',
             fontWeight: 700,
             fontSize: '22px',
-            color: '#0d5c2e',
+            color: '#117a3d',
             lineHeight: 1.28,
             margin: '0 0 32px',
           }}>
@@ -466,7 +469,7 @@ export default function LandingPage() {
                   width: '24px',
                   height: '24px',
                   borderRadius: '3px',
-                  background: '#0d5c2e',
+                  background: '#117a3d',
                   color: '#fff',
                   fontFamily: 'Merriweather, serif',
                   fontWeight: 700,
@@ -502,7 +505,7 @@ export default function LandingPage() {
 
       {/* ── CTA ── */}
       <section style={{
-        background: '#0d5c2e',
+        background: '#117a3d',
         padding: '52px 36px',
         textAlign: 'center',
       }}>
@@ -530,7 +533,7 @@ export default function LandingPage() {
 
         <div className="reveal stagger-2">
           <button
-            onClick={() => console.log('TODO: navigate-to-signup')}
+            onClick={() => router.push('/register')}
             style={{
               background: '#f9a8d4',
               color: '#fff',
@@ -555,7 +558,7 @@ export default function LandingPage() {
 
       {/* ── FOOTER ── */}
       <footer style={{
-        background: '#052016',
+        background: '#117a3d',
         padding: '16px 36px',
         display: 'flex',
         alignItems: 'center',
@@ -566,7 +569,7 @@ export default function LandingPage() {
             fontFamily: 'Satoshi, sans-serif',
             fontWeight: 700,
             fontSize: '13px',
-            background: 'linear-gradient(to right, #0d5c2e, #f9a8d4)',
+            background: 'linear-gradient(to right, #117a3d, #f9a8d4)',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
             backgroundClip: 'text',
