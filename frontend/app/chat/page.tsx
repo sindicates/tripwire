@@ -258,7 +258,7 @@ export default function ChatPage() {
               ))}
             </div>
           )}
-          <div style={{ display: "flex", gap: 10, alignItems: "flex-end", maxWidth: 800, margin: "0 auto" }}>
+          <div style={{ display: "flex", gap: 10, alignItems: "center", maxWidth: 800, margin: "0 auto" }}>
             <div style={{ flex: 1, position: "relative" }}>
               <textarea
                 ref={inputRef}
@@ -268,17 +268,18 @@ export default function ChatPage() {
                 placeholder="Ask about financial aid, deadlines, or academic policies…"
                 rows={1}
                 disabled={loading}
-                style={{ width: "100%", background: "rgba(18,38,24,0.9)", border: "1px solid #2a5636", borderRadius: 8, padding: "13px 46px 13px 16px", color: "#ffffff", fontSize: 14, outline: "none", resize: "none", lineHeight: 1.5, fontFamily: "'Satoshi', sans-serif", transition: "border-color 0.15s ease, box-shadow 0.15s ease", boxSizing: "border-box", opacity: loading ? 0.7 : 1 }}
+                style={{ width: "100%", background: "rgba(18,38,24,0.9)", border: "1px solid #2a5636", borderRadius: 8, padding: "13px 46px 13px 16px", color: "#ffffff", fontSize: 14, outline: "none", resize: "none", lineHeight: 1.5, fontFamily: "'Satoshi', sans-serif", transition: "border-color 0.15s ease, box-shadow 0.15s ease", boxSizing: "border-box", opacity: loading ? 0.7 : 1, display: "block" }}
                 onFocus={e => { e.currentTarget.style.borderColor = "#b5b0a8"; e.currentTarget.style.boxShadow = "0 0 0 3px rgba(181,176,168,0.1)" }}
                 onBlur={e => { e.currentTarget.style.borderColor = "#2a5636"; e.currentTarget.style.boxShadow = "none" }}
               />
-              <span style={{ position: "absolute", right: 14, bottom: 13, fontSize: 11, color: "#4a6a52" }}>⏎</span>
+              <span style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", fontSize: 11, color: "#4a6a52" }}>⏎</span>
             </div>
             <button
-              className="tw-btn-primary"
               onClick={() => sendMessage(input)}
               disabled={loading || !input.trim()}
-              style={{ padding: "13px 22px", borderRadius: 8, flexShrink: 0, opacity: loading || !input.trim() ? 0.5 : 1 }}
+              style={{ padding: "0 22px", height: 46, borderRadius: 8, flexShrink: 0, background: "linear-gradient(135deg, #b5b0a8, #2d6030)", color: "#111e14", border: "none", fontSize: 14, fontWeight: 700, fontFamily: "'Satoshi', sans-serif", cursor: loading || !input.trim() ? "not-allowed" : "pointer", opacity: loading || !input.trim() ? 0.5 : 1, whiteSpace: "nowrap", transition: "filter 0.15s ease", display: "flex", alignItems: "center", justifyContent: "center" }}
+              onMouseEnter={e => { if (!loading && input.trim()) e.currentTarget.style.filter = "brightness(1.1)" }}
+              onMouseLeave={e => { e.currentTarget.style.filter = "none" }}
             >
               {loading ? <span style={{ display: "inline-block", animation: "spin 1s linear infinite" }}>⟳</span> : "Send"}
             </button>
@@ -304,25 +305,25 @@ function EmptyState({ questions, onSelect }: { questions: string[]; onSelect: (q
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 32, padding: "40px 20px", animation: "fadeIn 0.4s ease" }}>
       <div style={{ textAlign: "center" }}>
-        <div style={{ width: 64, height: 64, borderRadius: 8, background: "rgba(181,176,168,0.1)", border: "1px solid rgba(181,176,168,0.2)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>
-          <MessageSquare size={28} color="#b5b0a8" strokeWidth={1.5} />
+        <div style={{ width: 64, height: 64, borderRadius: 8, background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.25)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px", backdropFilter: "blur(4px)" }}>
+          <MessageSquare size={28} color="#ffffff" strokeWidth={1.5} />
         </div>
-        <h2 style={{ fontFamily: "'Merriweather', serif", fontWeight: 700, fontSize: 22, margin: "0 0 10px", letterSpacing: "-0.3px" }}>Ask me anything</h2>
-        <p style={{ color: "#9aafa0", fontSize: 14, margin: 0, lineHeight: 1.7, maxWidth: 400 }}>
+        <h2 style={{ fontFamily: "'Merriweather', serif", fontWeight: 700, fontSize: 22, margin: "0 0 10px", letterSpacing: "-0.3px", color: "#ffffff", textShadow: "0 1px 4px rgba(0,0,0,0.3)" }}>Ask me anything</h2>
+        <p style={{ color: "rgba(255,255,255,0.75)", fontSize: 14, margin: 0, lineHeight: 1.7, maxWidth: 400, textShadow: "0 1px 3px rgba(0,0,0,0.2)" }}>
           Questions about financial aid, SAP requirements, registration deadlines, and more — all cited to your school&apos;s official source.
         </p>
       </div>
 
       <div style={{ width: "100%", maxWidth: 580 }}>
-        <div style={{ fontSize: 11, color: "#9aafa0", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 12, textAlign: "center" }}>Try asking</div>
+        <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 12, textAlign: "center" }}>Try asking</div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10 }}>
           {questions.map(q => (
             <button
               key={q}
               onClick={() => onSelect(q)}
-              style={{ background: "rgba(18,38,24,0.8)", border: "1px solid #2a5636", borderRadius: 8, padding: "12px 16px", color: "#9aafa0", fontSize: 13, cursor: "pointer", textAlign: "left", lineHeight: 1.4, transition: "all 0.15s ease", fontFamily: "'Satoshi', sans-serif" }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = "rgba(181,176,168,0.4)"; e.currentTarget.style.color = "#ffffff"; e.currentTarget.style.background = "rgba(181,176,168,0.06)" }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = "#2a5636"; e.currentTarget.style.color = "#9aafa0"; e.currentTarget.style.background = "rgba(18,38,24,0.8)" }}
+              style={{ background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 8, padding: "12px 16px", color: "rgba(255,255,255,0.8)", fontSize: 13, cursor: "pointer", textAlign: "left", lineHeight: 1.4, transition: "all 0.15s ease", fontFamily: "'Satoshi', sans-serif", backdropFilter: "blur(4px)" }}
+              onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.2)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.4)"; e.currentTarget.style.color = "#ffffff" }}
+              onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.12)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.2)"; e.currentTarget.style.color = "rgba(255,255,255,0.8)" }}
             >
               {q}
             </button>
