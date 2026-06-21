@@ -324,7 +324,7 @@ export default function LandingPage() {
             </p>
           </blockquote>
 
-          {/* Feature cards — wrapper handles reveal, inner div handles hover */}
+          {/* Feature cards */}
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(3, 1fr)',

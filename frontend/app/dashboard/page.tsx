@@ -79,7 +79,6 @@ interface Profile {
 
 export default function TripwireDashboard() {
   const [activeNav, setActiveNav] = useState<NavId>("dashboard")
-  const [advisorOpen, setAdvisorOpen] = useState(false)
   const [profile, setProfile] = useState<Profile>({ display_name: null, school: null, year: null })
   const router = useRouter()
 
@@ -107,8 +106,9 @@ export default function TripwireDashboard() {
 
   const handleNavClick = (id: NavId) => {
     setActiveNav(id)
-    if (id === "advisor") setAdvisorOpen(true)
-    if (id === "settings") router.push("/settings")
+    if (id === "advisor") router.push("/chat")
+    else if (id === "actions") router.push("/actions")
+    else if (id === "settings") router.push("/settings")
   }
 
   return (
@@ -128,11 +128,6 @@ export default function TripwireDashboard() {
         onClick={() => { setAdvisorOpen(true); console.log("TODO: open advisor panel") }}
         style={{ position: "fixed", bottom: 32, right: 32, width: 58, height: 58, borderRadius: "50%", background: "linear-gradient(135deg, #ffadc8, #ffc4d6)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, boxShadow: "0 4px 24px rgba(255, 173, 200, 0.4)", zIndex: 40 }}
       >💬</button>
-
-      {advisorOpen && (
-        <div onClick={() => setAdvisorOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 49, backdropFilter: "blur(2px)" }} />
-      )}
-      <AdvisorPanel open={advisorOpen} onClose={() => setAdvisorOpen(false)} />
     </div>
   )
 }

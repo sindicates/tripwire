@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Tripwire — Agent Context</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    font-size: 11pt;
+    line-height: 1.6;
+    color: #1a1a1a;
+    max-width: 750px;
+    margin: 40px auto;
+    padding: 0 32px;
+  }
+  h1 { font-size: 22pt; font-weight: bold; margin-top: 0; margin-bottom: 6px; }
+  h2 { font-size: 16pt; font-weight: bold; margin-top: 36px; margin-bottom: 8px; border-bottom: 1px solid #d0d0d0; padding-bottom: 4px; }
+  h3 { font-size: 13pt; font-weight: bold; margin-top: 24px; margin-bottom: 6px; }
+  p { margin: 0 0 10px; }
+  ul, ol { margin: 6px 0 12px 24px; padding: 0; }
+  li { margin-bottom: 5px; }
+  code {
+    font-family: "Courier New", monospace;
+    font-size: 9.5pt;
+    background: #f4f4f4;
+    padding: 1px 4px;
+    border-radius: 3px;
+  }
+  pre {
+    font-family: "Courier New", monospace;
+    font-size: 9pt;
+    background: #f4f4f4;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    padding: 12px 16px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin: 8px 0 16px;
+    line-height: 1.5;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 10pt;
+    margin: 10px 0 18px;
+  }
+  th {
+    background: #f0f0f0;
+    font-weight: bold;
+    text-align: left;
+    padding: 7px 10px;
+    border: 1px solid #d0d0d0;
+  }
+  td {
+    padding: 6px 10px;
+    border: 1px solid #d0d0d0;
+    vertical-align: top;
+  }
+  tr:nth-child(even) td { background: #fafafa; }
+  .meta {
+    font-size: 10pt;
+    color: #555;
+    font-style: italic;
+    background: #fffbea;
+    border-left: 4px solid #f0c040;
+    padding: 10px 14px;
+    margin-bottom: 28px;
+  }
+  .note {
+    font-size: 10pt;
+    color: #444;
+    background: #f0f7ff;
+    border-left: 4px solid #4a90d9;
+    padding: 9px 14px;
+    margin: 12px 0 16px;
+  }
+  .feature-log-placeholder {
+    font-size: 10.5pt;
+    color: #666;
+    font-style: italic;
+    padding: 14px;
+    border: 1px dashed #ccc;
+    border-radius: 4px;
+    margin-top: 8px;
+  }
+  hr { border: none; border-top: 1px solid #ddd; margin: 32px 0; }
+</style>
+</head>
+<body>
+
+<h1>Tripwire — Agent Context</h1>
+
+<div class="meta">
+When you implement a major feature, add a short section at the bottom of this document so future agents and teammates have clearer context on what was built, where it lives, and any DB or environment changes that came with it.
+</div>
+
+<h2>Overview</h2>
+
+<p>Tripwire is a proactive academic risk monitor for college students. It watches a student's GPA, credit pace, aid package, and administrative deadlines, then surfaces the exact action needed — grounded in that school's own policy documents — before a crisis materializes.</p>
+
+<p>The core loop: <strong>Sense → Predict → Retrieve → Act</strong></p>
+
+<hr>
+
+<h2>1. The Problem</h2>
+
+<ul>
+  <li><strong>Aid blindsides</strong> — students lose scholarships without knowing they were close to the threshold.</li>
+  <li><strong>Deadline black holes</strong> — SAP appeals, FAFSA renewals, and add/drop windows pass silently.</li>
+  <li><strong>Credential friction</strong> — first-gen students don't know what questions to ask an advisor.</li>
+  <li><strong>Policy opacity</strong> — financial aid handbooks are 40-page PDFs; the answer is in there but no one reads them.</li>
+</ul>
+
+<p><em>Insight: this is a navigation problem. Students need proactive direction, not a chatbot they have to think to ask.</em></p>
+
+<hr>
+
+<h2>2. Product Overview</h2>
+
+<p>Tripwire monitors in the background and surfaces risk before the student has to ask. When a threshold is crossed (GPA drifting toward aid floor, credit pace falling behind, FAFSA window opening), it retrieves the school's own policy document, synthesizes it with Claude, and delivers a plain-language action packet: the exact form, deadline, and office. Every answer is cited to the school's live policy page.</p>
+
+<p>Three surfaces: web dashboard (Next.js), mobile app (Expo), and push/SMS notifications.</p>
+
+<hr>
+
+<h2>3. Core Features</h2>
+
+<h3>Dashboard (web + mobile)</h3>
+<p>Credit completion timeline vs. required pace, risk event feed (severity-coded), aid status panel, projected graduation date.</p>
+
+<h3>Chat Q&A</h3>
+<p>RAG-grounded answers from the school's ingested docs. Every response cites the source page and last-verified date. No hallucinated thresholds.</p>
+
+<h3>Action Center</h3>
+<p>Each risk event expands to an action packet: exact form name, direct URL, deadline countdown, office contact. One-click "Mark as done" closes the loop.</p>
+
+<h3>Proactive Scheduler</h3>
+<p>Celery beat task runs nightly at 02:00 UTC. Evaluates risk rules per student. Calls Claude only when a rule fires — not per student per night. Delivers email, SMS, or in-app notification.</p>
+
+<h3>Onboarding</h3>
+<p>School search via College Scorecard API (6,000+ institutions), GPA/credits wizard, aid package entry, degree audit PDF upload.</p>
+
+<hr>
+
+<h2>4. Tech Stack</h2>
+
+<table>
+  <tr><th>Layer</th><th>Technology</th></tr>
+  <tr><td>Backend API</td><td>Python 3.11 / FastAPI, SQLAlchemy async (asyncpg)</td></tr>
+  <tr><td>Task queue</td><td>Celery + Redis</td></tr>
+  <tr><td>Database</td><td>PostgreSQL 16 + pgvector extension</td></tr>
+  <tr><td>AI reasoning</td><td><code>claude-sonnet-4-6</code> (Anthropic)</td></tr>
+  <tr><td>Embeddings</td><td><code>text-embedding-3-small</code> (OpenAI), 1536 dims</td></tr>
+  <tr><td>Web frontend</td><td>Next.js 14 App Router, TypeScript, Tailwind, shadcn/ui</td></tr>
+  <tr><td>Mobile</td><td>Expo SDK 52, Expo Router v4, TypeScript</td></tr>
+  <tr><td>Notifications</td><td>SendGrid (email) + Twilio (SMS)</td></tr>
+  <tr><td>Doc storage</td><td>S3 / Cloudflare R2</td></tr>
+  <tr><td>External data</td><td>College Scorecard API, IPEDS CSV downloads</td></tr>
+  <tr><td>Deployment</td><td>Railway/Render (backend), Vercel (web), EAS (mobile)</td></tr>
+</table>
+
+<hr>
+
+<h2>5. Codebase and Conventions</h2>
+
+<h3>Env &amp; Config</h3>
+<ul>
+  <li><strong>Single <code>.env</code> at the repo root</strong> holds all variables for every service. Copy once: <code>cp .env.example .env</code>.</li>
+  <li><code>frontend/.env.local</code> and <code>mobile/.env</code> are symlinks pointing to <code>../.env</code> — created automatically by <code>make setup</code>. Never edit them directly.</li>
+  <li><code>backend/app/config.py</code> reads <code>("../.env", ".env")</code> — root first, local fallback. Always <code>cd backend</code> before running uvicorn/celery/alembic so the relative path resolves correctly.</li>
+  <li>Import <code>settings</code> from <code>app.config</code> everywhere in the backend; never read <code>os.environ</code> directly.</li>
+</ul>
+
+<h3>AI</h3>
+<ul>
+  <li><code>backend/app/services/rag.py</code> — <code>RAGService</code>: embed query → pgvector cosine search filtered by <code>school_id</code> → re-rank by recency × cosine → pass top-5 chunks to Claude.</li>
+  <li><code>backend/app/services/risk_engine.py</code> — <code>RiskEngine</code>: deterministic rule evaluation per student, calls <code>RAGService</code> to build action packets when a rule fires.</li>
+  <li>Claude system prompt lives in <code>risk_engine.py</code> / <code>rag.py</code> — structured as: school name, risk description, student snapshot (GPA/credits/aid), retrieved chunks with source metadata, response format (plain-language + exact action + urgency + citations).</li>
+</ul>
+
+<div class="note"><strong>Never call Claude for policy questions without first retrieving chunks.</strong> Hallucinated policy thresholds are a trust-destroying failure mode.</div>
+
+<h3>Data &amp; Backend</h3>
+<ul>
+  <li>SQLAlchemy models: <code>backend/app/models/</code> — one file per table (<code>school</code>, <code>student</code>, <code>document</code> + <code>DocChunk</code>, <code>risk_event</code>, <code>alert</code>).</li>
+  <li><code>document.py</code> contains both <code>Document</code> and <code>DocChunk</code>. <code>DocChunk.embedding</code> is <code>Vector(1536)</code> — pgvector must be enabled before <code>alembic upgrade head</code>.</li>
+  <li><code>RiskEvent.severity</code> is a Python <code>str</code> enum: <code>"info"</code> / <code>"warn"</code> / <code>"urgent"</code>.</li>
+  <li><code>context_json</code> stores raw evidence (GPA value, threshold crossed); <code>action_packet_json</code> stores the <code>ActionPacket</code> shape (title, description, actions list with url + deadline).</li>
+  <li>Alembic migrations: <code>backend/migrations/</code>. After changing a model, run <code>alembic revision --autogenerate -m "description"</code> then <code>alembic upgrade head</code>. New model files must be imported in <code>migrations/env.py</code> or they won't be detected.</li>
+</ul>
+
+<h3>Task Scheduler</h3>
+<ul>
+  <li><code>backend/celery_app.py</code> — Celery app init + beat schedule. Nightly scan task fires at <code>crontab(hour=2, minute=0)</code> UTC. Task body is a stub — implement by calling <code>RiskEngine.scan_all()</code>.</li>
+  <li>Both <code>celery worker</code> and <code>celery beat</code> must be running. Beat emits the task message; worker consumes it. Running only one does nothing silently.</li>
+</ul>
+
+<h3>Document Ingestion</h3>
+<ul>
+  <li>Flow: URL submitted → Playwright/BeautifulSoup fetches page → chunk at 400 tokens / 50-token overlap, preserve section headings → embed via <code>text-embedding-3-small</code> → upsert to <code>doc_chunks</code> with <code>school_id</code>.</li>
+  <li><code>school_id</code> is on every <code>doc_chunks</code> row and must appear in every vector query WHERE clause. Without it, a student at School A gets answers from School B's policy.</li>
+  <li>Chunks fetched more than 14 days ago are considered stale and queued for re-ingestion.</li>
+</ul>
+
+<h3>Routing</h3>
+<ul>
+  <li>File-based routing in <code>frontend/app/</code> (Next.js App Router). Groups: <code>(auth)</code>, <code>dashboard</code>, <code>chat</code>, <code>actions</code>, <code>onboarding</code>.</li>
+  <li>File-based routing in <code>mobile/app/</code> (Expo Router). Groups: <code>(auth)</code>, <code>(tabs)</code> — tabs are: Dashboard / Ask / Actions.</li>
+  <li>All API routes: <code>http://localhost:8000/api/v1/&lt;resource&gt;</code>. Registered in <code>backend/app/main.py</code>.</li>
+</ul>
+
+<h3>TypeScript Types</h3>
+<ul>
+  <li><code>frontend/types/index.ts</code> and <code>mobile/types/index.ts</code> define the same domain interfaces. Keep them in sync manually when you change a model or add a field.</li>
+  <li>Key types: <code>Student</code>, <code>School</code>, <code>Document</code>, <code>DocChunk</code>, <code>RiskEvent</code> (with <code>RiskType</code> + <code>Severity</code> enums), <code>Alert</code> (with <code>Channel</code> enum), <code>ActionPacket</code>, <code>ActionItem</code>.</li>
+</ul>
+
+<h3>Auth (not yet implemented)</h3>
+<ul>
+  <li>JWT, HS256, signed with <code>SECRET_KEY</code> from <code>config.py</code>.</li>
+  <li>Dependency <code>get_current_student</code> (to be created in <code>app/dependencies.py</code>) will be used in all protected routes.</li>
+  <li>Header: <code>Authorization: Bearer &lt;token&gt;</code>.</li>
+</ul>
+
+<hr>
+
+<h2>6. Risk Rules</h2>
+
+<p>Risk types are defined as string constants matching the <code>RiskType</code> enum in <code>frontend/types/index.ts</code>. Each rule needs: <code>risk_type</code>, signal field, threshold, severity, and cooldown window.</p>
+
+<p><strong>Current list (none implemented yet):</strong></p>
+
+<table>
+  <tr><th>risk_type</th><th>Signal</th><th>Threshold</th><th>Severity</th><th>Cooldown</th></tr>
+  <tr><td><code>gpa_drop</code></td><td>student.gpa</td><td>&lt; retention floor</td><td>urgent</td><td>30 days</td></tr>
+  <tr><td><code>credit_deficit</code></td><td>credits_completed / credits_required</td><td>&lt; 67% (SAP pace)</td><td>warn</td><td>14 days</td></tr>
+  <tr><td><code>aid_risk</code></td><td>GPA + pace combo</td><td>Below aid eligibility</td><td>urgent</td><td>30 days</td></tr>
+  <tr><td><code>deadline_miss</code></td><td>Policy deadline proximity</td><td>&lt; 7 days</td><td>warn</td><td>1 day</td></tr>
+  <tr><td><code>academic_probation</code></td><td>GPA on probation</td><td>&lt; 2.0</td><td>urgent</td><td>30 days</td></tr>
+  <tr><td><code>satisfactory_academic_progress</code></td><td>Cumulative pace</td><td>&lt; school-specific %</td><td>warn</td><td>14 days</td></tr>
+</table>
+
+<p>When adding a rule: add the constant to <code>risk_engine.py</code>, add the enum value to both <code>types/index.ts</code> files, write a test in <code>backend/tests/test_risk_engine.py</code>, and update the table above.</p>
+
+<hr>
+
+<h2>7. Monetization (Planned)</h2>
+
+<ul>
+  <li><strong>Subscription</strong> — $15–25/mo for full risk monitoring + chat.</li>
+  <li><strong>School partnerships</strong> — white-labeled version for financial aid offices and advising centers.</li>
+  <li><strong>B2B ingestion</strong> — charge schools for managed doc ingestion and admin portal access.</li>
+</ul>
+
+<hr>
+
+<h2>8. Local Dev Quick Start</h2>
+
+<h3>First-time setup</h3>
+
+<pre>cp .env.example .env           # fill in ANTHROPIC_API_KEY, OPENAI_API_KEY, SECRET_KEY
+make setup                     # venv + pip install -r requirements.txt (from repo root)
+docker compose up -d
+source backend/.venv/bin/activate && cd backend && alembic upgrade head</pre>
+
+<h3>Daily dev (5 terminals)</h3>
+
+<pre>docker compose up -d                          # T1: infrastructure (postgres + redis)
+cd backend && uvicorn app.main:app --reload   # T2: API  →  http://localhost:8000
+cd backend && celery -A celery_app worker -l info   # T3: Celery worker
+cd backend && celery -A celery_app beat -l info     # T4: Celery beat
+cd frontend && npm run dev                    # T5: web  →  http://localhost:3000
+
+# Mobile (when needed)
+cd mobile && npx expo start                   # Expo Go / simulator
+# On physical device: set EXPO_PUBLIC_API_URL to your LAN IP
+# macOS: ipconfig getifaddr en0</pre>
+
+<div class="note"><strong>Required keys for local dev:</strong> <code>ANTHROPIC_API_KEY</code>, <code>OPENAI_API_KEY</code>, <code>SECRET_KEY</code>. Twilio, SendGrid, and S3 can be left blank until Phase 2.</div>
+
+<hr>
+
+<h2>9. Environment Variables</h2>
+
+<table>
+  <tr><th>Variable</th><th>Used by</th><th>How to get it</th><th>Required locally</th></tr>
+  <tr><td><code>ANTHROPIC_API_KEY</code></td><td>RiskEngine (Claude)</td><td>console.anthropic.com → API Keys</td><td>Yes</td></tr>
+  <tr><td><code>OPENAI_API_KEY</code></td><td>RAGService (embeddings)</td><td>platform.openai.com → API keys</td><td>Yes</td></tr>
+  <tr><td><code>DATABASE_URL</code></td><td>SQLAlchemy, Alembic</td><td>Default matches docker-compose</td><td>Yes (default works)</td></tr>
+  <tr><td><code>REDIS_URL</code></td><td>Celery broker</td><td>Default matches docker-compose</td><td>Yes (default works)</td></tr>
+  <tr><td><code>SECRET_KEY</code></td><td>JWT signing</td><td><code>openssl rand -hex 32</code></td><td>Yes</td></tr>
+  <tr><td><code>COLLEGE_SCORECARD_API_KEY</code></td><td>School search</td><td>api.data.gov/signup</td><td>No</td></tr>
+  <tr><td><code>SENDGRID_API_KEY</code></td><td>Email notifications</td><td>sendgrid.com → Settings → API Keys</td><td>No</td></tr>
+  <tr><td><code>TWILIO_ACCOUNT_SID</code></td><td>SMS notifications</td><td>twilio.com console</td><td>No</td></tr>
+  <tr><td><code>TWILIO_AUTH_TOKEN</code></td><td>SMS notifications</td><td>twilio.com console</td><td>No</td></tr>
+  <tr><td><code>TWILIO_PHONE_NUMBER</code></td><td>SMS notifications</td><td>twilio.com console</td><td>No</td></tr>
+  <tr><td><code>AWS_ACCESS_KEY_ID</code></td><td>S3 doc storage</td><td>IAM console</td><td>No</td></tr>
+  <tr><td><code>AWS_SECRET_ACCESS_KEY</code></td><td>S3 doc storage</td><td>IAM console</td><td>No</td></tr>
+  <tr><td><code>S3_BUCKET_NAME</code></td><td>S3 doc storage</td><td>Your bucket name</td><td>No</td></tr>
+  <tr><td><code>ENVIRONMENT</code></td><td>CORS strictness</td><td><code>development</code> or <code>production</code></td><td>Yes (default works)</td></tr>
+  <tr><td><code>ALLOWED_ORIGINS</code></td><td>CORS middleware</td><td>Comma-separated, e.g. <code>http://localhost:3000</code></td><td>Yes (default works)</td></tr>
+</table>
+
+<hr>
+
+<h2>10. Common Pitfalls</h2>
+
+<ul>
+  <li><strong>pgvector must be enabled before migrations.</strong> The <code>ankane/pgvector</code> Docker image pre-enables it. If you see <code>type "vector" does not exist</code>, run <code>CREATE EXTENSION IF NOT EXISTS vector;</code> manually.</li>
+  <li><strong>Both Celery worker and Celery beat must be running.</strong> Beat emits the task message; worker consumes it. Running only one does nothing silently.</li>
+  <li><strong><code>ALLOWED_ORIGINS</code> must include the exact frontend origin.</strong> A trailing slash or wrong port causes CORS to block all requests — including SSE — with a generic network error, not a CORS error.</li>
+  <li><strong><code>school_id</code> filter is mandatory on every vector query.</strong> Omitting it causes answers to bleed across schools.</li>
+  <li><strong>Never call Claude without RAG context for policy questions.</strong> Claude does not know your school's specific SAP thresholds or aid floors.</li>
+  <li><strong>New model files must be imported in <code>migrations/env.py</code></strong> or Alembic will not detect the table and will generate empty migrations.</li>
+  <li><strong>Expo physical device requires LAN IP, not <code>localhost</code>.</strong> <code>localhost</code> on a phone resolves to the phone itself. Use <code>ipconfig getifaddr en0</code> on macOS to find your IP.</li>
+  <li><strong>Always <code>cd backend</code> before running uvicorn / celery / alembic.</strong> The config file reads <code>../env</code> — the relative path only resolves from inside the <code>backend/</code> directory.</li>
+</ul>
+
+<hr>
+
+<h2>11. Useful One-Liners</h2>
+
+<pre># Generate a new migration after model changes
+cd backend && alembic revision --autogenerate -m "describe change"
+
+# Apply all pending migrations
+cd backend && alembic upgrade head
+
+# Roll back one migration
+cd backend && alembic downgrade -1
+
+# Flush all Redis data (clears Celery queues — destructive)
+docker compose exec redis redis-cli FLUSHALL
+
+# Connect to local Postgres
+docker compose exec postgres psql -U postgres -d tripwire
+
+# Count doc chunks per school
+docker compose exec postgres psql -U postgres -d tripwire \
+  -c "SELECT school_id, COUNT(*) FROM doc_chunks GROUP BY school_id;"
+
+# Check API health
+curl http://localhost:8000/health
+
+# Inspect Celery active tasks
+cd backend && celery -A celery_app inspect active</pre>
+
+<hr>
+
+<h2>Feature Log</h2>
+
+<p>Add a section below each time a major feature ships. Include: what it does, where it lives (file paths), any new env vars, and any DB migrations added.</p>
+
+<div class="feature-log-placeholder">
+No features implemented yet. First entry goes here.
+</div>
+
+</body>
+</html>

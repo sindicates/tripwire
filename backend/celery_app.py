@@ -1,3 +1,5 @@
+import asyncio
+
 from celery import Celery
 from celery.schedules import crontab
 
@@ -22,4 +24,12 @@ celery_app.conf.timezone = "UTC"
 
 @celery_app.task(name="celery_app.nightly_risk_scan")
 def nightly_risk_scan() -> None:
-    pass
+    asyncio.run(_async_scan())
+
+
+async def _async_scan() -> None:
+    from app.database import AsyncSessionLocal
+    from app.services.risk_engine import risk_engine
+
+    async with AsyncSessionLocal() as session:
+        await risk_engine.scan_all(session)
