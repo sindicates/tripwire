@@ -250,7 +250,7 @@ export default function ChatPage() {
         </div>
 
         {/* Input bar */}
-        <div style={{ padding: "12px 32px 16px", borderTop: "1px solid rgba(42,86,54,0.6)", background: "rgba(30,56,36,0.7)", backdropFilter: "blur(12px)", flexShrink: 0 }}>
+        <div style={{ padding: "20px 32px 16px", borderTop: "1px solid rgba(42,86,54,0.6)", background: "rgba(30,56,36,0.7)", backdropFilter: "blur(12px)", flexShrink: 0 }}>
           <div style={{ display: "flex", gap: 10, alignItems: "center", maxWidth: 800, margin: "0 auto" }}>
             <div style={{ flex: 1, position: "relative" }}>
               <textarea
@@ -277,7 +277,7 @@ export default function ChatPage() {
               {loading ? <span style={{ display: "inline-block", animation: "spin 1s linear infinite" }}>⟳</span> : "Send"}
             </button>
           </div>
-          <div style={{ fontSize: 11, color: "#4a6a52", textAlign: "center", marginTop: 10 }}>
+          <div style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", textAlign: "center", marginTop: 10 }}>
             Answers are grounded in official policy documents. Verify with your advisor before acting.
           </div>
         </div>
