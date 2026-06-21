@@ -4,21 +4,28 @@ import math
 import uuid
 from datetime import datetime, timedelta, timezone
 
+import asyncio
+
 import anthropic
-import openai
+from sentence_transformers import SentenceTransformer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.models.document import DocChunk
 
-EMBED_MODEL = "text-embedding-3-small"
+EMBED_MODEL = "all-MiniLM-L6-v2"
 CLAUDE_MODEL = "claude-sonnet-4-6"
 STALE_DAYS = 14
 
+_embedding_model: SentenceTransformer | None = None
 
-def _openai_client() -> openai.AsyncOpenAI:
-    return openai.AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+
+def _get_embedding_model() -> SentenceTransformer:
+    global _embedding_model
+    if _embedding_model is None:
+        _embedding_model = SentenceTransformer(EMBED_MODEL)
+    return _embedding_model
 
 
 def _anthropic_client() -> anthropic.AsyncAnthropic:
@@ -41,12 +48,11 @@ class RAGService:
         self.db = db
 
     async def embed_chunks(self, chunks: list[str]) -> list[list[float]]:
-        resp = await _openai_client().embeddings.create(input=chunks, model=EMBED_MODEL)
-        return [item.embedding for item in resp.data]
+        model = _get_embedding_model()
+        vectors = await asyncio.to_thread(model.encode, chunks)
+        return [v.tolist() for v in vectors]
 
     async def search(self, query: str, school_id: str | uuid.UUID, top_k: int = 5) -> list[dict]:
-        [query_vec] = await self.embed_chunks([query])
-
         result = await self.db.execute(
             select(DocChunk).where(
                 DocChunk.school_id == uuid.UUID(str(school_id)),
@@ -54,6 +60,10 @@ class RAGService:
             )
         )
         chunks = result.scalars().all()
+        if not chunks:
+            return []
+
+        [query_vec] = await self.embed_chunks([query])
 
         stale_cutoff = datetime.now(timezone.utc) - timedelta(days=STALE_DAYS)
         scored: list[tuple[float, DocChunk]] = []

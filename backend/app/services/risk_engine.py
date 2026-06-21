@@ -407,12 +407,21 @@ class RiskEngine:
             f"Policy documents:\n{chunk_text}"
         )
 
-        message = await _anthropic_client().messages.create(
-            model=CLAUDE_MODEL,
-            max_tokens=1024,
-            system=system,
-            messages=[{"role": "user", "content": prompt}],
-        )
+        try:
+            message = await _anthropic_client().messages.create(
+                model=CLAUDE_MODEL,
+                max_tokens=1024,
+                system=system,
+                messages=[{"role": "user", "content": prompt}],
+            )
+        except Exception:
+            return {
+                "title": f"Risk detected: {risk_type}",
+                "description": "Action plan unavailable — AI service unreachable.",
+                "urgency": context.get("severity", "warn"),
+                "actions": [],
+                "citations": [],
+            }
 
         raw = message.content[0].text.strip()
         # Strip markdown code fences if Claude wrapped the JSON
@@ -434,8 +443,11 @@ class RiskEngine:
 
     async def scan_student(self, student_id: uuid.UUID) -> list[dict[str, Any]]:
         """Evaluate all rules for one student and persist any new risk events."""
+        from sqlalchemy.orm import selectinload
         result = await self.db.execute(
-            select(Student).where(Student.id == student_id)
+            select(Student)
+            .options(selectinload(Student.school))
+            .where(Student.id == student_id)
         )
         student = result.scalar_one_or_none()
         if student is None:
