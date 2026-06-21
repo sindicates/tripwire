@@ -173,7 +173,7 @@ function Sidebar({ activeNav, onNavClick, onSignOut, profile }: { activeNav: Nav
     <aside className="tw-sidebar" style={{ width: 220, minWidth: 220, background: "#1e3824", borderRight: "1px solid #2a5636", display: "flex", flexDirection: "column", position: "sticky", top: 0, height: "100vh", overflowY: "auto", flexShrink: 0 }}>
       <div className="tw-sidebar-logo" style={{ display: "flex", alignItems: "center", gap: 10, padding: "28px 20px 32px" }}>
         <SherpaLogo size={26} />
-        <span className="nav-brand tw-sidebar-logo-text">Sherpa</span>
+        <span className="sidebar-brand tw-sidebar-logo-text">Sherpa</span>
       </div>
 
       <nav style={{ flex: 1, padding: "0 10px", display: "flex", flexDirection: "column", gap: 2 }}>
