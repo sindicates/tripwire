@@ -69,9 +69,9 @@ export default function SettingsPage() {
 
       {/* Sidebar */}
       <aside style={{ width: 220, minWidth: 220, background: "#1e3824", borderRight: "1px solid #2a5636", display: "flex", flexDirection: "column", position: "sticky", top: 0, height: "100vh", overflowY: "auto", flexShrink: 0 }}>
-        <a href="/" style={{ display: "flex", alignItems: "center", gap: 10, padding: "28px 20px 32px", textDecoration: "none" }}>
-          <img src="/logo.png" width={44} height={44} alt="Sherpa" style={{ objectFit: "contain" }} />
-          <span style={{ fontFamily: "'Satoshi', sans-serif", fontWeight: 700, fontSize: 17, background: "linear-gradient(to right, #c8d5cb, #b5b0a8)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text", letterSpacing: "-0.3px" }}>Sherpa</span>
+        <a href="/" style={{ display: "flex", alignItems: "center", gap: 6, padding: "28px 20px 32px", textDecoration: "none" }}>
+          <img src="/logo.png" width={52} height={52} alt="Sherpa" style={{ objectFit: "contain" }} />
+          <span className="nav-brand">Sherpa</span>
         </a>
         <nav style={{ flex: 1, padding: "0 10px", display: "flex", flexDirection: "column", gap: 2 }}>
           {NAV_ITEMS.map(({ id, Icon, label }) => (
@@ -137,11 +137,11 @@ export default function SettingsPage() {
             >
               <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                 <div style={{ width: 36, height: 36, borderRadius: 8, background: "rgba(181,176,168,0.1)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                  <LogOut size={18} color="#9aafa0" strokeWidth={1.5} />
+                  <LogOut size={18} color="#b5b0a8" strokeWidth={1.5} />
                 </div>
                 <div>
-                  <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 2, color: "#9aafa0" }}>Sign Out</div>
-                  <div style={{ fontSize: 12, color: "#6b8077" }}>Sign out of your Sherpa account</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 2 }}>Sign Out</div>
+                  <div style={{ fontSize: 12, color: "#9aafa0" }}>Sign out of your Sherpa account</div>
                 </div>
               </div>
               <span style={{ color: "#9aafa0", fontSize: 16, flexShrink: 0, marginLeft: 12 }}>→</span>

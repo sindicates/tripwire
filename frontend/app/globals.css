@@ -219,14 +219,12 @@
 .nav-brand {
   font-family: 'Satoshi', sans-serif;
   font-weight: 700;
-  font-size: 22px;
-  background: linear-gradient(to right, #0d5c2e, #f472b6);
+  font-size: 17px;
+  background: linear-gradient(to right, #c8d5cb, #b5b0a8);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  letter-spacing: -0.4px;
-  -webkit-text-stroke: 0.6px rgba(255, 255, 255, 0.4);
-  paint-order: stroke fill;
+  letter-spacing: -0.3px;
 }
 
 /* ── Hero entry animations (fires on load via CSS keyframe) ── */

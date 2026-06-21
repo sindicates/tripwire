@@ -272,6 +272,7 @@ export default function DeadlineRadarPage() {
     else if (id === "advisor") router.push("/chat")
     else if (id === "actions") router.push("/actions")
     else if (id === "risk-feed") router.push("/dashboard")
+    else if (id === "settings") router.push("/settings")
   }
 
   function toggleCat(cat: DeadlineCategory) {

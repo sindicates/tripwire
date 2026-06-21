@@ -297,16 +297,16 @@ function DashboardHeader({ profile, activeCount, onSignOut }: { profile: Supabas
         <h1 style={{ fontFamily: "'Merriweather', serif", fontWeight: 700, fontSize: 28, margin: 0, letterSpacing: "-0.3px", lineHeight: 1.2 }}>
           {greeting}{firstName ? `, ${firstName}` : ""}
         </h1>
-        <p style={{ color: "#9aafa0", margin: "8px 0 0", fontSize: 14, display: "flex", alignItems: "center", gap: 8 }}>
+        <p style={{ color: "#ffffff", margin: "8px 0 0", fontSize: 14, display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", background: activeCount > 0 ? "#facc15" : "#4ade80", boxShadow: `0 0 5px ${activeCount > 0 ? "#facc15" : "#4ade80"}` }} />
           {activeCount > 0 ? `${activeCount} risk${activeCount > 1 ? "s" : ""} need${activeCount === 1 ? "s" : ""} your attention` : "No active risks"}
         </p>
       </div>
       <button
         onClick={onSignOut}
-        style={{ background: "none", border: "1px solid #2a5636", borderRadius: 8, padding: "8px 14px", color: "#9aafa0", fontSize: 13, cursor: "pointer", transition: "border-color 0.15s ease, color 0.15s ease", whiteSpace: "nowrap", flexShrink: 0 }}
+        style={{ background: "none", border: "1px solid #2a5636", borderRadius: 8, padding: "8px 14px", color: "#ffffff", fontSize: 13, cursor: "pointer", transition: "border-color 0.15s ease, color 0.15s ease", whiteSpace: "nowrap", flexShrink: 0 }}
         onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#b5b0a8"; e.currentTarget.style.color = "#b5b0a8" }}
-        onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#2a5636"; e.currentTarget.style.color = "#9aafa0" }}
+        onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#2a5636"; e.currentTarget.style.color = "#ffffff" }}
       >Sign out</button>
     </div>
   )
@@ -341,7 +341,7 @@ function StatCards({ student, profile, status }: { student: BackendStudent | nul
       <div className="tw-card" style={{ padding: 24, borderRadius: 8 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
           <div>
-            <div style={{ fontSize: 11, color: "#9aafa0", textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 600, marginBottom: 6 }}>Current GPA</div>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.65)", textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 600, marginBottom: 6 }}>Current GPA</div>
             <div style={{ fontFamily: "'Merriweather', serif", fontWeight: 700, fontSize: 40, color: gpa != null ? gpaColor : "#9aafa0", lineHeight: 1 }}>
               {isLoading ? "—" : gpa != null ? gpa.toFixed(2) : "—"}
             </div>
@@ -351,7 +351,7 @@ function StatCards({ student, profile, status }: { student: BackendStudent | nul
           )}
         </div>
         <div style={{ marginTop: 18 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#9aafa0", marginBottom: 6 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "rgba(255,255,255,0.65)", marginBottom: 6 }}>
             <span>Aid floor: {AID_FLOOR.toFixed(1)}</span>
             {gpa != null && <span style={{ color: gpaColor }}>{gpa >= AID_FLOOR ? `+${(gpa - AID_FLOOR).toFixed(2)} above` : `${(gpa - AID_FLOOR).toFixed(2)} below`}</span>}
           </div>
@@ -365,10 +365,10 @@ function StatCards({ student, profile, status }: { student: BackendStudent | nul
       <div className="tw-card" style={{ padding: 24, borderRadius: 8 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
           <div>
-            <div style={{ fontSize: 11, color: "#9aafa0", textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 600, marginBottom: 6 }}>Credits Completed</div>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.65)", textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 600, marginBottom: 6 }}>Credits Completed</div>
             <div style={{ fontFamily: "'Merriweather', serif", fontWeight: 700, fontSize: 40, lineHeight: 1 }}>
               <span style={{ color: "#b5b0a8" }}>{isLoading ? "—" : done ?? "—"}</span>
-              {req && <span style={{ color: "#9aafa0", fontSize: 22, fontWeight: 400 }}> / {req}</span>}
+              {req && <span style={{ color: "rgba(255,255,255,0.55)", fontSize: 22, fontWeight: 400 }}> / {req}</span>}
             </div>
           </div>
           {creditPct != null && (
@@ -376,7 +376,7 @@ function StatCards({ student, profile, status }: { student: BackendStudent | nul
           )}
         </div>
         <div style={{ marginTop: 18 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#9aafa0", marginBottom: 6 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "rgba(255,255,255,0.65)", marginBottom: 6 }}>
             <span>Progress to degree</span>
             {remaining != null && <span>{remaining} remaining</span>}
           </div>
@@ -389,7 +389,7 @@ function StatCards({ student, profile, status }: { student: BackendStudent | nul
       {/* Financial Aid */}
       <div className="tw-card" style={{ padding: 24, borderRadius: 8 }}>
         <div>
-          <div style={{ fontSize: 11, color: "#9aafa0", textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 600, marginBottom: 8 }}>Financial Aid</div>
+          <div style={{ fontSize: 11, color: "rgba(255,255,255,0.65)", textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 600, marginBottom: 8 }}>Financial Aid</div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#4ade80", display: "inline-block", boxShadow: "0 0 8px rgba(74,222,128,0.7)", flexShrink: 0 }} />
             <span style={{ fontFamily: "'Merriweather', serif", fontWeight: 700, fontSize: 30, color: "#4ade80" }}>
@@ -399,11 +399,11 @@ function StatCards({ student, profile, status }: { student: BackendStudent | nul
         </div>
         <div style={{ marginTop: 18, paddingTop: 14, borderTop: "1px solid #2a5636", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
           <div>
-            <div style={{ fontSize: 11, color: "#9aafa0" }}>Next review</div>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.65)" }}>Next review</div>
             <div style={{ fontSize: 14, color: "#ffffff", fontWeight: 600, marginTop: 2 }}>{aidReview ?? "—"}</div>
           </div>
           <div>
-            <div style={{ fontSize: 11, color: "#9aafa0" }}>Aid type</div>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.65)" }}>Aid type</div>
             <div style={{ fontSize: 14, color: "#ffffff", fontWeight: 600, marginTop: 2 }}>{aidType ?? "—"}</div>
           </div>
         </div>
@@ -433,7 +433,7 @@ function RiskFeed({ events, status, scanning, studentId, onResolve, onScan }: {
             </span>
           )}
           {status === "offline" && (
-            <span style={{ fontSize: 11, color: "#9aafa0" }}>backend offline</span>
+            <span style={{ fontSize: 11, color: "#ffffff" }}>backend offline</span>
           )}
         </div>
         {status === "ok" && studentId && (
@@ -457,7 +457,7 @@ function RiskFeed({ events, status, scanning, studentId, onResolve, onScan }: {
       {status === "ok" && events.length === 0 && (
         <div style={{ border: "1px dashed #2a5636", borderRadius: 10, padding: "32px 24px", textAlign: "center" }}>
           <div style={{ fontSize: 14, color: "#4ade80", fontWeight: 600, marginBottom: 6 }}>No active risks</div>
-          <div style={{ fontSize: 13, color: "#9aafa0" }}>
+          <div style={{ fontSize: 13, color: "#ffffff" }}>
             {studentId
               ? <>Click <strong>Run scan</strong> above to check for new risks.</>
               : "Risks will appear here once detected."}
@@ -467,8 +467,8 @@ function RiskFeed({ events, status, scanning, studentId, onResolve, onScan }: {
 
       {status === "offline" && (
         <div style={{ border: "1px dashed #2a5636", borderRadius: 10, padding: "24px", textAlign: "center" }}>
-          <div style={{ fontSize: 13, color: "#9aafa0" }}>Start the FastAPI server to load live risk events.</div>
-          <div style={{ fontFamily: "monospace", fontSize: 11, color: "#4a6a52", marginTop: 8 }}>cd backend && uvicorn app.main:app --reload</div>
+          <div style={{ fontSize: 13, color: "#ffffff" }}>Start the FastAPI server to load live risk events.</div>
+          <div style={{ fontFamily: "monospace", fontSize: 11, color: "rgba(255,255,255,0.45)", marginTop: 8 }}>cd backend && uvicorn app.main:app --reload</div>
         </div>
       )}
 
@@ -493,16 +493,16 @@ function RiskCardItem({ event, onResolve }: { event: RiskEvent; onResolve: (id: 
         <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#ffffff", lineHeight: 1.4, fontFamily: "'Merriweather', serif" }}>{title}</h3>
         <span style={{ background: s.badge, color: "#111e14", fontSize: 10, fontWeight: 800, padding: "3px 9px", borderRadius: 4, letterSpacing: "0.08em", flexShrink: 0, marginTop: 2 }}>{s.label}</span>
       </div>
-      <p style={{ margin: "0 0 16px", fontSize: 13, color: "#9aafa0", lineHeight: 1.65 }}>{description}</p>
+      <p style={{ margin: "0 0 16px", fontSize: 13, color: "rgba(255,255,255,0.75)", lineHeight: 1.65 }}>{description}</p>
       {packet?.actions && packet.actions.length > 0 && (
         <div style={{ marginBottom: 12, display: "flex", flexDirection: "column", gap: 4 }}>
           {packet.actions.map((a, i) => (
-            <div key={i} style={{ fontSize: 12, color: "#9aafa0", display: "flex", alignItems: "center", gap: 8 }}>
+            <div key={i} style={{ fontSize: 12, color: "rgba(255,255,255,0.75)", display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ color: s.border }}>→</span>
               {a.url ? (
                 <a href={a.url} target="_blank" rel="noreferrer" style={{ color: s.border, textDecoration: "none" }}>{a.label}</a>
               ) : <span>{a.label}</span>}
-              {a.deadline && <span style={{ color: "#4a6a52" }}>· due {a.deadline}</span>}
+              {a.deadline && <span style={{ color: "rgba(255,255,255,0.45)" }}>· due {a.deadline}</span>}
             </div>
           ))}
         </div>
@@ -510,7 +510,7 @@ function RiskCardItem({ event, onResolve }: { event: RiskEvent; onResolve: (id: 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         <button className="tw-btn-primary" style={{ fontSize: 12, padding: "6px 14px" }} onClick={() => onResolve(event.id)}>Resolve</button>
         {packet?.citations?.[0] && (
-          <span style={{ fontSize: 11, color: "#4a6a52", alignSelf: "center" }}>Source: {packet.citations[0]}</span>
+          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.45)", alignSelf: "center" }}>Source: {packet.citations[0]}</span>
         )}
       </div>
     </div>
@@ -585,13 +585,13 @@ function ActionCenter({ events, status, onResolve }: { events: RiskEvent[]; stat
 
       {status === "loading" && (
         <div style={{ border: "1px dashed #2a5636", borderRadius: 10, padding: "24px", textAlign: "center" }}>
-          <div style={{ fontSize: 13, color: "#9aafa0" }}>Loading actions…</div>
+          <div style={{ fontSize: 13, color: "#ffffff" }}>Loading actions…</div>
         </div>
       )}
 
       {status === "ok" && actions.length === 0 && (
         <div style={{ border: "1px dashed #2a5636", borderRadius: 10, padding: "24px", textAlign: "center" }}>
-          <div style={{ fontSize: 13, color: "#9aafa0" }}>No pending actions — looking good.</div>
+          <div style={{ fontSize: 13, color: "#ffffff" }}>No pending actions — looking good.</div>
         </div>
       )}
 
@@ -610,7 +610,7 @@ function ActionCenter({ events, status, onResolve }: { events: RiskEvent[]; stat
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                     <span style={{ background: `${item.tagColor}20`, color: item.tagColor, fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 4, letterSpacing: "0.06em" }}>{item.tag}</span>
-                    <span style={{ fontSize: 12, color: "#9aafa0" }}>{item.meta}</span>
+                    <span style={{ fontSize: 12, color: "rgba(255,255,255,0.65)" }}>{item.meta}</span>
                   </div>
                 </div>
               </div>
