@@ -71,7 +71,7 @@ export default function SettingsPage() {
       <aside style={{ width: 220, minWidth: 220, background: "#1e3824", borderRight: "1px solid #2a5636", display: "flex", flexDirection: "column", position: "sticky", top: 0, height: "100vh", overflowY: "auto", flexShrink: 0 }}>
         <a href="/" style={{ display: "flex", alignItems: "center", gap: 6, padding: "28px 20px 32px", textDecoration: "none" }}>
           <img src="/logo.png" width={52} height={52} alt="Sherpa" style={{ objectFit: "contain" }} />
-          <span className="nav-brand">Sherpa</span>
+          <span className="sidebar-brand tw-sidebar-logo-text">Sherpa</span>
         </a>
         <nav style={{ flex: 1, padding: "0 10px", display: "flex", flexDirection: "column", gap: 2 }}>
           {NAV_ITEMS.map(({ id, Icon, label }) => (
