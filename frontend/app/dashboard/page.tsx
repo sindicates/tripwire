@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 
@@ -71,10 +71,32 @@ const SUGGESTED_QUESTIONS = [
 
 // ── Root component ───────────────────────────────────────────────────────────
 
+interface Profile {
+  display_name: string | null
+  school: string | null
+  year: string | null
+}
+
 export default function TripwireDashboard() {
   const [activeNav, setActiveNav] = useState<NavId>("dashboard")
   const [advisorOpen, setAdvisorOpen] = useState(false)
+  const [profile, setProfile] = useState<Profile>({ display_name: null, school: null, year: null })
   const router = useRouter()
+
+  useEffect(() => {
+    async function loadProfile() {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data } = await supabase
+        .from("students")
+        .select("display_name, school, year")
+        .eq("user_id", user.id)
+        .single()
+      if (data) setProfile(data)
+    }
+    loadProfile()
+  }, [])
 
   async function signOut() {
     const supabase = createClient()
@@ -86,14 +108,14 @@ export default function TripwireDashboard() {
   const handleNavClick = (id: NavId) => {
     setActiveNav(id)
     if (id === "advisor") setAdvisorOpen(true)
-    console.log(`TODO: navigate to ${id}`)
+    if (id === "settings") router.push("/settings")
   }
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: "#0a1a0f", color: "#ffffff", fontFamily: "'Inter', sans-serif" }}>
-      <Sidebar activeNav={activeNav} onNavClick={handleNavClick} onSignOut={signOut} />
+      <Sidebar activeNav={activeNav} onNavClick={handleNavClick} onSignOut={signOut} profile={profile} />
       <main className="tw-main-content" style={{ flex: 1, overflowY: "auto", padding: "36px 44px", minWidth: 0 }}>
-        <DashboardHeader onSignOut={signOut} />
+        <DashboardHeader onSignOut={signOut} profile={profile} />
         <StatCards />
         <RiskFeed />
         <ActionCenter />
@@ -117,7 +139,11 @@ export default function TripwireDashboard() {
 
 // ── Sidebar ──────────────────────────────────────────────────────────────────
 
-function Sidebar({ activeNav, onNavClick, onSignOut }: { activeNav: NavId; onNavClick: (id: NavId) => void; onSignOut: () => void }) {
+function Sidebar({ activeNav, onNavClick, onSignOut, profile }: { activeNav: NavId; onNavClick: (id: NavId) => void; onSignOut: () => void; profile: Profile }) {
+  const name = profile.display_name || "You"
+  const initials = name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()
+  const subtitle = [profile.school, profile.year].filter(Boolean).join(" · ") || "Tripwire"
+
   return (
     <aside className="tw-sidebar" style={{ width: 220, minWidth: 220, background: "#0d1f13", borderRight: "1px solid #1e3d28", display: "flex", flexDirection: "column", position: "sticky", top: 0, height: "100vh", overflowY: "auto", flexShrink: 0 }}>
       <div className="tw-sidebar-logo" style={{ display: "flex", alignItems: "center", gap: 8, padding: "28px 20px 32px" }}>
@@ -136,10 +162,10 @@ function Sidebar({ activeNav, onNavClick, onSignOut }: { activeNav: NavId; onNav
 
       <div className="tw-sidebar-user" style={{ padding: "16px 20px", borderTop: "1px solid #1e3d28", display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ width: 36, height: 36, borderRadius: "50%", background: "linear-gradient(135deg, #ff6b9d, #ff8fb1)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 13, color: "#fff", flexShrink: 0 }}>RA</div>
+          <div style={{ width: 36, height: 36, borderRadius: "50%", background: "linear-gradient(135deg, #ff6b9d, #ff8fb1)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 13, color: "#fff", flexShrink: 0 }}>{initials}</div>
           <div className="tw-sidebar-user-text" style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: "#ffffff" }}>Retuz A.</div>
-            <div style={{ fontSize: 11, color: "#a3c4a8" }}>UNR · Junior</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "#ffffff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</div>
+            <div style={{ fontSize: 11, color: "#a3c4a8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{subtitle}</div>
           </div>
         </div>
         <button className="tw-btn-ghost tw-sidebar-label" onClick={onSignOut} style={{ fontSize: 12, textAlign: "left", padding: "4px 0", color: "#a3c4a8" }}>Sign out →</button>
@@ -150,11 +176,15 @@ function Sidebar({ activeNav, onNavClick, onSignOut }: { activeNav: NavId; onNav
 
 // ── Dashboard header ──────────────────────────────────────────────────────────
 
-function DashboardHeader({ onSignOut }: { onSignOut: () => void }) {
+function DashboardHeader({ onSignOut, profile }: { onSignOut: () => void; profile: Profile }) {
+  const hour = new Date().getHours()
+  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening"
+  const firstName = profile.display_name?.split(" ")[0] ?? null
+
   return (
     <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 32, gap: 16 }}>
       <div>
-        <h1 style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 30, margin: 0, letterSpacing: "-0.5px", lineHeight: 1.2 }}>Good morning, Retuz 👋</h1>
+        <h1 style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 30, margin: 0, letterSpacing: "-0.5px", lineHeight: 1.2 }}>{greeting}{firstName ? `, ${firstName}` : ""} 👋</h1>
         <p style={{ color: "#a3c4a8", margin: "8px 0 0", fontSize: 15, display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "#ff6b9d", boxShadow: "0 0 6px #ff6b9d" }} />
           3 risks need your attention

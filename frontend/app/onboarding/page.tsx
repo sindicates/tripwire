@@ -30,6 +30,7 @@ const GPA_RANGES = [
 ] as const
 
 const EMPTY_FORM = {
+  display_name: "",
   school: "",
   year: "",
   major: "",
@@ -82,6 +83,7 @@ export default function OnboardingPage() {
         if (data) {
           setIsEdit(true)
           setForm({
+            display_name: data.display_name ?? "",
             school: data.school ?? "",
             year: data.year ?? "",
             major: data.major ?? "",
@@ -126,6 +128,7 @@ export default function OnboardingPage() {
     const { error: dbError } = await supabase.from("students").upsert({
       user_id: user.id,
       email: user.email,
+      display_name: form.display_name || null,
       school: form.school || null,
       year: form.year || null,
       major: form.major || null,
@@ -179,6 +182,10 @@ export default function OnboardingPage() {
 
         <div className="bg-white rounded-2xl border border-border shadow-sm p-8">
           <form onSubmit={handleSubmit} className="space-y-6">
+
+            <Field label="Display Name">
+              <input type="text" value={form.display_name} onChange={set("display_name")} className={inputClass} placeholder="e.g. Alex Johnson" />
+            </Field>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               <Field label="School">
