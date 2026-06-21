@@ -318,26 +318,19 @@ background: linear-gradient(180deg, #1a3320 0%, #252e2a 100%);
 /* Primary button — opposite direction: stone to vivid green */
 background: linear-gradient(135deg, #b5b0a8, #2d6030);
 
-/* Brand wordmark */
-background: linear-gradient(to right, #1e5228, #b5b0a8);
+/* Brand wordmark (on dark backgrounds) */
+background: linear-gradient(to right, #c8d5cb, #b5b0a8);
 ```
 
-### Sherpa logo SVG
+### Sherpa logo
 
-A React component — use wherever the brand mark is needed (sidebar, auth pages, mobile header, email templates, etc.). Do **not** use the 🏔️ emoji or any other placeholder.
+The logo lives at `frontend/public/logo.png`. Use an `<img>` tag — do **not** use the 🏔️ emoji or any inline SVG placeholder.
 
 ```tsx
-function SherpaLogo({ size = 26 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Sherpa">
-      <path d="M14 3L26 23H2L14 3Z" stroke="#b5b0a8" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
-      <path d="M14 3L10.5 11L14 9L17.5 11L14 3Z" fill="#b5b0a8" />
-    </svg>
-  )
-}
+<img src="/logo.png" width={44} height={44} alt="Sherpa" style={{ objectFit: "contain" }} />
 ```
 
-On light backgrounds swap stroke/fill to `#1e5228` (forest green). On dark backgrounds use `#b5b0a8` (stone) as shown above.
+Adjust `width`/`height` to context (44px sidebar, 32px navbar, 26px inline). Works on both dark and light backgrounds.
 
 No emojis anywhere in the UI — use Lucide React icons for all iconography (`lucide-react` is installed via shadcn/ui).
 

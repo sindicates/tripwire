@@ -99,8 +99,7 @@ export default function SettingsPage() {
                   </div>
                 </div>
                 <button className="tw-btn-ghost tw-sidebar-label" onClick={signOut} style={{ fontSize: 12, textAlign: "left", padding: "4px 0", color: "#9aafa0" }}>Sign out →</button>
-              </div>
-            </div>
+              </div>            </div>
           </div>
 
           {/* Dynamic Indicators */}
@@ -153,11 +152,11 @@ export default function SettingsPage() {
             >
               <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                 <div style={{ width: 36, height: 36, borderRadius: 8, background: "rgba(181,176,168,0.1)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                  <LogOut size={18} color="#9aafa0" strokeWidth={1.5} />
+                  <LogOut size={18} color="#b5b0a8" strokeWidth={1.5} />
                 </div>
                 <div>
-                  <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 2, color: "#9aafa0" }}>Sign Out</div>
-                  <div style={{ fontSize: 12, color: "#6b8077" }}>Sign out of your Sherpa account</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 2 }}>Sign Out</div>
+                  <div style={{ fontSize: 12, color: "#9aafa0" }}>Sign out of your Sherpa account</div>
                 </div>
               </div>
               <span style={{ color: "#9aafa0", fontSize: 16, flexShrink: 0, marginLeft: 12 }}>→</span>

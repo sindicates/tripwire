@@ -1,12 +1,14 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { AlertTriangle, FileText, ListChecks, LucideIcon } from 'lucide-react'
 
 export default function LandingPage() {
   const router = useRouter()
+  const leftMtnRef  = useRef<HTMLDivElement>(null)
+  const rightMtnRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const els = document.querySelectorAll('.reveal, .reveal-left, .reveal-scale')
@@ -22,7 +24,18 @@ export default function LandingPage() {
       { threshold: 0.12, root: null }
     )
     els.forEach((el) => observer.observe(el))
-    return () => observer.disconnect()
+
+    function handleScroll() {
+      const p = Math.max(0, Math.min(window.scrollY / (window.innerHeight * 0.75), 1))
+      if (leftMtnRef.current)  leftMtnRef.current.style.transform  = `translateX(${-p * 280}px)`
+      if (rightMtnRef.current) rightMtnRef.current.style.transform = `translateX(${p * 280}px)`
+    }
+    window.addEventListener('scroll', handleScroll, { passive: true })
+
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('scroll', handleScroll)
+    }
   }, [])
 
   return (
@@ -39,26 +52,35 @@ export default function LandingPage() {
         top: 0,
         zIndex: 50,
       }}>
-        <Link href="/" style={{ textDecoration: 'none' }}>
-          <span className="nav-brand">Tripwire</span>
+        <Link href="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 5 }}>
+          <img src="/logo.png" width={42} height={42} alt="Sherpa" style={{ objectFit: 'contain' }} />
+          <span className="nav-brand">Sherpa</span>
         </Link>
 
         <div style={{ display: 'flex', gap: '28px' }}>
-          {(['How it works', 'Risk types', 'About'] as const).map((link) => (
-            <a
-              key={link}
-              href="#"
+          {([['About', 'why-sherpa'], ['How it works', 'how-it-works']] as const).map(([label, id]) => (
+            <button
+              key={label}
+              onClick={() => {
+                const el = document.getElementById(id)
+                if (!el) return
+                const top = el.getBoundingClientRect().top + window.scrollY - 58
+                window.scrollTo({ top, behavior: 'smooth' })
+              }}
               style={{
+                background: 'none',
+                border: 'none',
                 fontFamily: 'Satoshi, sans-serif',
                 fontWeight: 400,
                 fontSize: '14px',
                 color: 'rgba(255,255,255,0.6)',
-                textDecoration: 'none',
+                cursor: 'pointer',
+                padding: 0,
                 transition: 'color 0.15s',
               }}
               onMouseEnter={(e) => (e.currentTarget.style.color = '#fff')}
               onMouseLeave={(e) => (e.currentTarget.style.color = 'rgba(255,255,255,0.6)')}
-            >{link}</a>
+            >{label}</button>
           ))}
         </div>
 
@@ -93,62 +115,95 @@ export default function LandingPage() {
         <div style={{
           position: 'absolute',
           inset: 0,
-          background: 'linear-gradient(180deg, #1e3824 0%, #2e5a3c 22%, #3a7050 38%, rgba(30,56,36,0.4) 58%, rgba(249,250,251,0.88) 80%, #f9fafb 100%)',
+          background: 'linear-gradient(180deg, #1e3824 0%, #2e5a3c 20%, #3a7050 35%, rgba(30,56,36,0.28) 50%, rgba(249,250,251,0.92) 63%, #f9fafb 72%)',
         }} />
 
-        {/* SVG data visualization */}
-        <svg
-          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
-          viewBox="0 0 1200 490"
-          preserveAspectRatio="xMidYMid slice"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <ellipse cx="200" cy="480" rx="280" ry="50" fill="#0f1a10" opacity="0.5" />
-          <ellipse cx="700" cy="490" rx="400" ry="60" fill="#0f1a10" opacity="0.4" />
-          <ellipse cx="1100" cy="475" rx="220" ry="40" fill="#1e3824" opacity="0.35" />
+        {/* Left mountain — peak on the outer LEFT, inner slope faces center */}
+        <div ref={leftMtnRef} style={{ position: 'absolute', left: 0, top: '-2%', width: '50%', height: '106%', willChange: 'transform', pointerEvents: 'none' }}>
+          <svg viewBox="0 0 720 900" width="100%" height="100%" preserveAspectRatio="xMinYMin meet" xmlns="http://www.w3.org/2000/svg">
+            {/* Distant haze range — different silhouette from right mountain */}
+            <path d="M-80,900 L40,660 L145,420 L320,182 L488,20 L620,900Z" fill="#2d6038" opacity="0.22"/>
+            {/* f1: outer left face — large lit polygon (sun from above-left) */}
+            <path d="M100,12 L62,68 L-80,340 L-80,900 L245,900 L260,80 L100,12Z" fill="#3a7044"/>
+            {/* f2: peak A upper bevel — brightest facet */}
+            <path d="M100,12 L64,58 L100,34 L136,58 L100,12Z" fill="#4d9058" opacity="0.92"/>
+            {/* f4: Peak B — widened left shoulder so snow cap sits on mountain */}
+            <path d="M260,80 L172,126 L188,900 L310,900 L310,126 L260,80Z" fill="#2d6038" opacity="0.88"/>
+            {/* f6: Peak C — widened both sides, heavier right */}
+            <path d="M398,156 L340,206 L268,900 L362,900 L446,224 L398,156Z" fill="#2a5a34" opacity="0.82"/>
+            {/* f7: inner valley slope — shadow face (updated vertices to match wider f4/f6) */}
+            <path d="M100,12 L136,58 L310,126 L446,224 L496,448 L576,678 L638,900 L362,900 L282,678 L202,448 L132,258 L100,12Z" fill="#1e3c28" opacity="0.88"/>
+            {/* f8: deep valley shadow — steepest inner face */}
+            <path d="M398,156 L446,224 L496,448 L576,678 L638,900 L502,900 L422,618 L358,378 L398,156Z" fill="#132c1a" opacity="0.92"/>
+            {/* Lower outer fill */}
+            <path d="M172,126 L-80,900 L188,900Z" fill="#264e2e" opacity="0.52"/>
+            {/* Snow A: outer left face — runs deeper, jagged lower edge */}
+            <path d="M100,12 L58,66 L36,108 L58,98 L48,122 L70,106 L90,92 L100,12Z" fill="rgba(252,254,252,0.91)"/>
+            {/* Snow A: inner valley face — shorter, cool shadow tone */}
+            <path d="M100,12 L90,92 L138,102 L136,58 L100,12Z" fill="rgba(232,246,255,0.84)"/>
+            {/* Snow A: bright peak tip */}
+            <path d="M100,12 L80,44 L100,26 L118,40 L100,12Z" fill="rgba(255,255,255,0.99)"/>
+            {/* Snow A: detached cornice on outer face */}
+            <path d="M48,104 L34,120 L54,116 L60,100 L48,104Z" fill="rgba(255,255,255,0.62)"/>
+            {/* Snow A–B ridge bevel — asymmetric, left-heavy */}
+            <path d="M136,58 L116,94 L130,80 L140,88 L158,78 L168,96 L136,58Z" fill="rgba(248,254,250,0.72)"/>
+            {/* Snow B: left heavier, ragged right edge */}
+            <path d="M260,80 L226,132 L210,162 L228,148 L218,168 L248,150 L260,124 L274,132 L294,148 L260,80Z" fill="rgba(248,253,250,0.83)"/>
+            {/* Snow B: tip */}
+            <path d="M260,80 L248,102 L260,90 L274,100 L260,80Z" fill="rgba(255,255,255,0.96)"/>
+            {/* Snow C: irregular, extends more to right */}
+            <path d="M398,156 L376,202 L362,228 L382,218 L390,234 L404,212 L418,226 L436,212 L420,202 L398,156Z" fill="rgba(235,250,240,0.74)"/>
+            {/* Snow C: tip */}
+            <path d="M398,156 L388,176 L398,166 L410,174 L398,156Z" fill="rgba(255,255,255,0.90)"/>
+            {/* Foreground scree */}
+            <path d="M-80,900 L52,847 L150,872 L252,844 L352,868 L452,840 L552,864 L638,900Z" fill="#0d1e10" opacity="0.58"/>
+          </svg>
+        </div>
 
-          <polyline
-            points="80,430 350,300 600,190 850,110 1100,55"
-            fill="none"
-            stroke="#b5b0a8"
-            strokeWidth="1.5"
-            strokeDasharray="6,5"
-            opacity="0.7"
-          />
+        {/* Right mountain — peak on the outer RIGHT, inner slope faces center */}
+        <div ref={rightMtnRef} style={{ position: 'absolute', right: 0, top: '-2%', width: '50%', height: '106%', willChange: 'transform', pointerEvents: 'none' }}>
+          <svg viewBox="0 0 720 900" width="100%" height="100%" preserveAspectRatio="xMaxYMin meet" xmlns="http://www.w3.org/2000/svg">
+            {/* Distant haze range — different silhouette from left mountain */}
+            <path d="M800,900 L678,590 L548,360 L385,148 L238,28 L112,900Z" fill="#2d6038" opacity="0.22"/>
+            {/* f1: outer right face — lit */}
+            <path d="M620,12 L658,68 L800,340 L800,900 L475,900 L460,80 L620,12Z" fill="#3a7044"/>
+            {/* f2: peak A upper bevel */}
+            <path d="M620,12 L656,58 L620,34 L584,58 L620,12Z" fill="#4d9058" opacity="0.92"/>
+            {/* f4: Peak B — widened right shoulder (asymmetric: left mountain widens left) */}
+            <path d="M460,80 L430,126 L414,900 L532,900 L548,126 L460,80Z" fill="#2d6038" opacity="0.88"/>
+            {/* f6: Peak C — widened left shoulder (asymmetric: left mountain widens right) */}
+            <path d="M322,156 L276,206 L204,900 L358,900 L380,226 L322,156Z" fill="#2a5a34" opacity="0.82"/>
+            {/* f7: inner valley slope — shadow (updated vertices to match wider f4/f6) */}
+            <path d="M620,12 L584,58 L430,126 L380,226 L224,448 L144,678 L82,900 L358,900 L438,678 L518,448 L588,258 L620,12Z" fill="#1e3c28" opacity="0.88"/>
+            {/* f8: deep valley shadow */}
+            <path d="M322,156 L380,226 L224,448 L144,678 L82,900 L218,900 L298,618 L362,378 L322,156Z" fill="#132c1a" opacity="0.92"/>
+            {/* Lower outer fill */}
+            <path d="M548,126 L800,900 L532,900Z" fill="#264e2e" opacity="0.52"/>
+            {/* Snow A: outer right face — runs deeper, jagged lower edge */}
+            <path d="M620,12 L662,66 L684,108 L662,98 L672,122 L650,106 L630,92 L620,12Z" fill="rgba(252,254,252,0.91)"/>
+            {/* Snow A: inner valley face — shorter, cool shadow tone */}
+            <path d="M620,12 L630,92 L582,102 L584,58 L620,12Z" fill="rgba(232,246,255,0.84)"/>
+            {/* Snow A: bright peak tip */}
+            <path d="M620,12 L640,44 L620,26 L602,40 L620,12Z" fill="rgba(255,255,255,0.99)"/>
+            {/* Snow A: detached cornice on outer face */}
+            <path d="M672,104 L686,120 L666,116 L660,100 L672,104Z" fill="rgba(255,255,255,0.62)"/>
+            {/* Snow A–B ridge bevel — asymmetric, right-heavy */}
+            <path d="M584,58 L604,94 L590,80 L580,88 L562,78 L552,96 L584,58Z" fill="rgba(248,254,250,0.72)"/>
+            {/* Snow B: right heavier, ragged left edge */}
+            <path d="M460,80 L494,132 L510,162 L492,148 L502,168 L472,150 L460,124 L446,132 L426,148 L460,80Z" fill="rgba(248,253,250,0.83)"/>
+            {/* Snow B: tip */}
+            <path d="M460,80 L472,102 L460,90 L446,100 L460,80Z" fill="rgba(255,255,255,0.96)"/>
+            {/* Snow C: irregular, extends more to left */}
+            <path d="M322,156 L344,202 L358,228 L338,218 L330,234 L316,212 L302,226 L284,212 L300,202 L322,156Z" fill="rgba(235,250,240,0.74)"/>
+            {/* Snow C: tip */}
+            <path d="M322,156 L332,176 L322,166 L310,174 L322,156Z" fill="rgba(255,255,255,0.90)"/>
+            {/* Foreground scree */}
+            <path d="M800,900 L668,847 L570,872 L468,844 L368,868 L268,840 L168,864 L82,900Z" fill="#0d1e10" opacity="0.58"/>
+          </svg>
+        </div>
 
-          <circle cx="350" cy="300" r="5" fill="#b5b0a8" opacity="0.9" />
-
-          <circle cx="600" cy="190" r="22" fill="none" stroke="#b5b0a8" strokeWidth="0.8" opacity="0.2" />
-          <circle cx="600" cy="190" r="13" fill="none" stroke="#b5b0a8" strokeWidth="1" opacity="0.4" />
-          <circle cx="600" cy="190" r="5" fill="#b5b0a8" opacity="0.9" />
-
-          <circle cx="850" cy="110" r="5" fill="#b5b0a8" opacity="0.9" />
-
-          <g transform="translate(110, 72)">
-            <rect width="164" height="102" rx="3" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.2)" strokeWidth="1" />
-            <rect x="10" y="12" width="52" height="8" rx="2" fill="#b5b0a8" opacity="0.7" />
-            <rect x="10" y="30" width="124" height="5" rx="1.5" fill="rgba(255,255,255,0.18)" />
-            <rect x="10" y="42" width="94" height="5" rx="1.5" fill="rgba(255,255,255,0.12)" />
-            <rect x="10" y="54" width="108" height="5" rx="1.5" fill="rgba(255,255,255,0.12)" />
-            <rect x="10" y="74" width="50" height="16" rx="2" fill="#b5b0a8" opacity="0.6" />
-          </g>
-
-          <g transform="translate(878, 195)">
-            <rect width="158" height="96" rx="3" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.2)" strokeWidth="1" />
-            <rect x="10" y="12" width="62" height="8" rx="2" fill="#b5b0a8" opacity="0.65" />
-            <rect x="10" y="30" width="118" height="5" rx="1.5" fill="rgba(255,255,255,0.18)" />
-            <rect x="10" y="42" width="88" height="5" rx="1.5" fill="rgba(255,255,255,0.12)" />
-            <rect x="10" y="54" width="102" height="5" rx="1.5" fill="rgba(255,255,255,0.12)" />
-            <rect x="10" y="70" width="46" height="15" rx="2" fill="#b5b0a8" opacity="0.6" />
-          </g>
-        </svg>
-
-        {/* Fade-to-body overlay */}
-        <div style={{
-          position: 'absolute',
-          inset: 0,
-          background: 'linear-gradient(180deg, transparent 40%, rgba(249,250,251,0.7) 72%, #f9fafb 100%)',
-        }} />
+        {/* Fade to body */}
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, transparent 22%, rgba(249,250,251,0.55) 46%, #f9fafb 63%)', pointerEvents: 'none' }} />
 
         {/* Hero content — CSS fadeUp keyframe, fires on load */}
         <div style={{
@@ -184,8 +239,8 @@ export default function LandingPage() {
             margin: '0 0 22px',
             animation: 'fadeUp 0.65s cubic-bezier(0.22,1,0.36,1) 0.20s both',
           }}>
-            Know before<br />
-            it <em style={{ color: '#86efac', fontStyle: 'italic' }}>costs you.</em>
+            Welcome to<br />
+            <em style={{ color: '#86efac', fontStyle: 'italic' }}>Sherpa.</em>
           </h1>
 
           <p style={{
@@ -198,15 +253,15 @@ export default function LandingPage() {
             margin: '0 0 30px',
             animation: 'fadeUp 0.65s cubic-bezier(0.22,1,0.36,1) 0.32s both',
           }}>
-            Tripwire monitors your GPA, aid standing, and graduation pace — and tells you exactly what to do before the deadline passes.
+            Sherpa monitors your GPA, aid standing, and graduation pace — and tells you exactly what to do before the deadline passes.
           </p>
 
           <div style={{ display: 'flex', gap: '9px', animation: 'fadeUp 0.65s cubic-bezier(0.22,1,0.36,1) 0.42s both' }}>
             <button
               onClick={() => router.push('/register')}
               style={{
-                background: '#b5b0a8',
-                color: '#fff',
+                background: 'linear-gradient(135deg, #b5b0a8, #2d6030)',
+                color: '#111e14',
                 fontFamily: 'Satoshi, sans-serif',
                 fontWeight: 700,
                 fontSize: '13px',
@@ -214,10 +269,10 @@ export default function LandingPage() {
                 padding: '10px 20px',
                 border: 'none',
                 cursor: 'pointer',
-                transition: 'background 0.15s, transform 0.1s',
+                transition: 'filter 0.15s, transform 0.1s',
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = '#8a8680')}
-              onMouseLeave={(e) => (e.currentTarget.style.background = '#b5b0a8')}
+              onMouseEnter={(e) => (e.currentTarget.style.filter = 'brightness(1.08)')}
+              onMouseLeave={(e) => (e.currentTarget.style.filter = 'brightness(1)')}
               onMouseDown={(e) => (e.currentTarget.style.transform = 'scale(0.97)')}
               onMouseUp={(e) => (e.currentTarget.style.transform = 'scale(1)')}
             >
@@ -254,7 +309,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── WHY TRIPWIRE ── */}
-      <section style={{ background: '#f9fafb', padding: '52px 36px' }}>
+      <section id="why-sherpa" style={{ background: '#f9fafb', padding: '52px 36px', position: 'relative', zIndex: 1, marginTop: '-60px' }}>
         <div style={{ maxWidth: '840px', margin: '0 auto' }}>
 
           <p className="reveal" style={{
@@ -267,7 +322,7 @@ export default function LandingPage() {
             textTransform: 'uppercase',
             letterSpacing: '0.6px',
           }}>
-            Why Tripwire
+            Why it matters
           </p>
 
           <h2 className="reveal stagger-1" style={{
@@ -279,7 +334,7 @@ export default function LandingPage() {
             lineHeight: 1.28,
             margin: '0 0 20px',
           }}>
-            Most students don&apos;t lose aid because they stopped trying.
+            Nobody is watching your aid status for you.
           </h2>
 
           <p className="reveal stagger-2" style={{
@@ -291,7 +346,7 @@ export default function LandingPage() {
             lineHeight: 1.75,
             margin: '0 0 32px',
           }}>
-            They lose it because nobody told them the deadline was two weeks away, or the credit math wasn&apos;t adding up. Advising offices are overbooked, school portals bury the information, and no one is watching your trajectory in real time. Tripwire does.
+            Financial aid has a lot of moving parts — SAP reviews, FAFSA renewal windows, credit minimums, add/drop deadlines. Advisors are stretched thin and school portals aren&apos;t built to warn you in advance. Sherpa fills that gap. It monitors the things that affect your enrollment and funding, and tells you what to do while you still have time to do it.
           </p>
 
           {/* Quote block */}
@@ -311,7 +366,7 @@ export default function LandingPage() {
               lineHeight: 1.7,
               margin: '0 0 10px',
             }}>
-              &ldquo;I didn&apos;t know my SAP status had slipped until my aid was already paused. By then it was too late to appeal for that semester.&rdquo;
+              &ldquo;I didn&apos;t find out my aid was on hold until I tried to register for spring. I had no idea my completion rate had dropped below the threshold.&rdquo;
             </p>
             <p style={{
               fontFamily: 'Satoshi, sans-serif',
@@ -320,7 +375,7 @@ export default function LandingPage() {
               color: '#6b7280',
               margin: 0,
             }}>
-              — First-gen student, community college, 2024
+              — Community college student, 2024
             </p>
           </blockquote>
 
@@ -328,31 +383,31 @@ export default function LandingPage() {
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(3, 1fr)',
-            gap: '10px',
-            marginBottom: '32px',
+            gap: '14px',
+            marginBottom: '36px',
           }}>
             <FeatureCard
               iconBg="#dcfce7"
               iconColor="#1ba84e"
               Icon={AlertTriangle}
-              title="Risk detection before it's too late"
-              desc="GPA drops, SAP failures, FAFSA windows — flagged weeks ahead with clear urgency levels."
+              title="Early warnings, not last-minute alerts"
+              desc="You'll know about GPA risks, SAP reviews, and FAFSA deadlines weeks in advance — not the day before."
               delayClass="stagger-1"
             />
             <FeatureCard
-              iconBg="#fce7f3"
+              iconBg="#f3f4f6"
               iconColor="#9aafa0"
               Icon={FileText}
-              title="Grounded in your school's actual rules"
-              desc="Every alert cites official financial aid and registrar documents. No guessing."
+              title="Based on your school's actual policies"
+              desc="Alerts are built from your school's own financial aid and registrar documents, not general guidance."
               delayClass="stagger-2"
             />
             <FeatureCard
               iconBg="#f0fdf4"
               iconColor="#1e3824"
               Icon={ListChecks}
-              title="Exact next steps, not vague suggestions"
-              desc='Each risk comes with the specific form, deadline, and office — not "contact your advisor."'
+              title="Specific enough to act on"
+              desc="Every alert tells you the form, the office, and the deadline. You don't have to figure out the next step yourself."
               delayClass="stagger-3"
             />
           </div>
@@ -365,28 +420,29 @@ export default function LandingPage() {
             gridTemplateColumns: 'repeat(3, 1fr)',
           }}>
             {[
-              { num: '$3.7B', label: 'in Pell Grant aid goes unclaimed each year', border: true },
-              { num: '40%', label: "of first-gen students don't finish their degree", border: true },
-              { num: '1 in 4', label: 'students lose aid for missing a single deadline', border: false },
+              { num: '$3.7B', label: "in federal aid goes unclaimed each year, largely because students missed a filing window or didn't know they qualified.", border: true },
+              { num: '40%', label: "of first-generation students don't complete their degree.", border: true },
+              { num: '1 in 4', label: 'students have lost aid due to a missed deadline or paperwork gap.', border: false },
             ].map(({ num, label, border }) => (
               <div key={num} style={{
-                padding: '20px 22px',
+                padding: '28px 32px',
                 textAlign: 'center',
                 borderRight: border ? '1px solid rgba(255,255,255,0.09)' : 'none',
               }}>
                 <p style={{
                   fontFamily: 'Merriweather, serif',
                   fontWeight: 900,
-                  fontSize: '26px',
+                  fontSize: '34px',
                   color: '#b5b0a8',
-                  margin: '0 0 4px',
+                  margin: '0 0 6px',
+                  whiteSpace: 'nowrap',
                 }}>{num}</p>
                 <p style={{
                   fontFamily: 'Satoshi, sans-serif',
                   fontWeight: 400,
-                  fontSize: '11.5px',
+                  fontSize: '13px',
                   color: 'rgba(255,255,255,0.45)',
-                  lineHeight: 1.5,
+                  lineHeight: 1.55,
                   margin: 0,
                 }}>{label}</p>
               </div>
@@ -424,7 +480,7 @@ export default function LandingPage() {
             lineHeight: 1.28,
             margin: '0 0 32px',
           }}>
-            Set up in minutes. Monitors you all semester.
+            Set it up once. Runs on its own after that.
           </h2>
 
           <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -432,48 +488,48 @@ export default function LandingPage() {
               {
                 n: '1',
                 title: 'Connect your school',
-                desc: 'Search 6,000+ institutions. Tripwire ingests your financial aid, registrar, and advising documents.',
+                desc: 'Search from over 6,000 institutions. Sherpa pulls in the relevant policies from your financial aid and registrar offices.',
                 delay: 'stagger-1',
                 last: false,
               },
               {
                 n: '2',
-                title: 'Enter your academic profile',
-                desc: 'GPA, credits, aid package, and graduation target. Upload your degree audit for full trajectory analysis.',
+                title: 'Enter your academic details',
+                desc: 'Your GPA, credits, aid package, and graduation goal. You can also upload your degree audit for more precise tracking.',
                 delay: 'stagger-2',
                 last: false,
               },
               {
                 n: '3',
-                title: 'Get alerts before risks become problems',
-                desc: 'Nightly scans surface risks with exact action steps — the form, the deadline, the office.',
+                title: 'Stay informed automatically',
+                desc: 'Sherpa checks your status each night. If something needs attention, you get a clear alert — including the specific form, deadline, and where to submit it.',
                 delay: 'stagger-3',
                 last: false,
               },
               {
                 n: '4',
-                title: 'Ask your policy advisor anything',
-                desc: '"Can I drop this class without losing aid?" Answers grounded in your school\'s actual rules.',
+                title: 'Get answers when you have questions',
+                desc: "Ask anything about your school's policies in plain language.",
                 delay: 'stagger-4',
                 last: true,
               },
             ].map(({ n, title, desc, delay, last }) => (
               <div key={n} className={`reveal-left ${delay}`} style={{
                 display: 'flex',
-                gap: '16px',
-                padding: '16px 0',
+                gap: '20px',
+                padding: '24px 0',
                 borderBottom: last ? 'none' : '1px solid #f3f4f6',
                 alignItems: 'flex-start',
               }}>
                 <div style={{
-                  width: '24px',
-                  height: '24px',
-                  borderRadius: '3px',
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '4px',
                   background: '#1e3824',
                   color: '#fff',
                   fontFamily: 'Merriweather, serif',
                   fontWeight: 700,
-                  fontSize: '10.5px',
+                  fontSize: '13.5px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -484,16 +540,16 @@ export default function LandingPage() {
                   <p style={{
                     fontFamily: 'Merriweather, serif',
                     fontWeight: 700,
-                    fontSize: '12.5px',
+                    fontSize: '16px',
                     color: '#111827',
-                    margin: '0 0 4px',
+                    margin: '0 0 6px',
                   }}>{title}</p>
                   <p style={{
                     fontFamily: 'Satoshi, sans-serif',
                     fontWeight: 400,
-                    fontSize: '12.5px',
+                    fontSize: '14px',
                     color: '#9ca3af',
-                    lineHeight: 1.6,
+                    lineHeight: 1.65,
                     margin: 0,
                   }}>{desc}</p>
                 </div>
@@ -506,7 +562,7 @@ export default function LandingPage() {
       {/* ── CTA ── */}
       <section style={{
         background: '#1e3824',
-        padding: '52px 36px',
+        padding: '22px 36px 16px',
         textAlign: 'center',
       }}>
         <h2 className="reveal" style={{
@@ -564,17 +620,9 @@ export default function LandingPage() {
         alignItems: 'center',
         justifyContent: 'space-between',
       }}>
-        <div style={{ opacity: 0.5 }}>
-          <span style={{
-            fontFamily: 'Satoshi, sans-serif',
-            fontWeight: 700,
-            fontSize: '13px',
-            background: 'linear-gradient(to right, #1e3824, #b5b0a8)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text',
-            letterSpacing: '-0.4px',
-          }}>Tripwire</span>
+        <div style={{ opacity: 0.6, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <img src="/logo.png" width={24} height={24} alt="Sherpa" style={{ objectFit: 'contain' }} />
+          <span className="nav-brand" style={{ fontSize: '13px' }}>Sherpa</span>
         </div>
         <p style={{
           fontFamily: 'Satoshi, sans-serif',
@@ -613,8 +661,8 @@ function FeatureCard({
         style={{
           background: '#fff',
           border: '1px solid #e5e7eb',
-          borderRadius: '4px',
-          padding: '16px',
+          borderRadius: '6px',
+          padding: '24px',
           height: '100%',
           boxSizing: 'border-box',
           transition: 'border-color 0.15s, transform 0.15s',
@@ -630,31 +678,31 @@ function FeatureCard({
         }}
       >
         <div style={{
-          width: '32px',
-          height: '32px',
-          borderRadius: '4px',
+          width: '44px',
+          height: '44px',
+          borderRadius: '6px',
           background: iconBg,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          marginBottom: '12px',
+          marginBottom: '16px',
         }}>
-          <Icon size={16} color={iconColor} />
+          <Icon size={20} color={iconColor} />
         </div>
         <p style={{
           fontFamily: 'Merriweather, serif',
           fontWeight: 700,
-          fontSize: '12px',
+          fontSize: '15px',
           color: '#111827',
-          margin: '0 0 6px',
+          margin: '0 0 8px',
           lineHeight: 1.4,
         }}>{title}</p>
         <p style={{
           fontFamily: 'Satoshi, sans-serif',
           fontWeight: 400,
-          fontSize: '12px',
+          fontSize: '13.5px',
           color: '#9ca3af',
-          lineHeight: 1.55,
+          lineHeight: 1.6,
           margin: 0,
         }}>{desc}</p>
       </div>

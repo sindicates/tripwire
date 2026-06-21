@@ -5,6 +5,10 @@
 @tailwind components;
 @tailwind utilities;
 
+html {
+  scroll-behavior: smooth;
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -349,14 +353,21 @@
 .nav-brand {
   font-family: 'Satoshi', sans-serif;
   font-weight: 700;
-  font-size: 22px;
-  background: linear-gradient(to right, #0d5c2e, #f472b6);
+  font-size: 17px;
+  background: linear-gradient(to right, #c8d5cb, #b5b0a8);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  letter-spacing: -0.4px;
-  -webkit-text-stroke: 0.6px rgba(255, 255, 255, 0.4);
-  paint-order: stroke fill;
+  letter-spacing: -0.3px;
+}
+
+/* ── Wizard / loading screen animations ── */
+@keyframes sherpa-spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes sherpa-pulse {
+  0%, 100% { opacity: 0.2; transform: scale(0.85); }
+  50%       { opacity: 0.9; transform: scale(1); }
 }
 
 /* ── Hero entry animations (fires on load via CSS keyframe) ── */

@@ -220,6 +220,7 @@ export default function ActionsPage() {
     else if (id === "advisor")  router.push("/chat")
     else if (id === "timeline") router.push("/deadline-radar")
     else if (id === "risk-feed") router.push("/dashboard")
+    else if (id === "settings") router.push("/settings")
   }
 
   const fetchEvents = useCallback(async () => {

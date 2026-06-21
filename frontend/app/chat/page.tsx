@@ -219,6 +219,7 @@ export default function ChatPage() {
     else if (id === "actions")  router.push("/actions")
     else if (id === "timeline") router.push("/deadline-radar")
     else if (id === "risk-feed") router.push("/dashboard")
+    else if (id === "settings") router.push("/settings")
   }
 
   async function sendMessage(question: string) {
