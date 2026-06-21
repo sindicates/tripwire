@@ -33,6 +33,7 @@ from app.services.risk_engine import (
     _evaluate_rules,
     _gpa_severity,
     _school_slug,
+    _parse_partial_json,
 )
 
 
@@ -653,3 +654,21 @@ def test_deadline_miss_invalid_timezone_falls_back_to_utc():
     fired = {r.risk_type for r in results}
     assert "deadline_miss" in fired, \
         "deadline_miss must still fire when timezone is invalid (UTC fallback)"
+
+
+def test_parse_partial_json_handles_truncated_response():
+    """Verify that _parse_partial_json successfully parses a truncated JSON string."""
+    truncated = (
+        '{ "title": "GPA Near Financial Aid Minimum — Act Before You Fall Below 2.0", '
+        '"description": "Your cumulative GPA of 2.12 is only 0.12 points above the federal floor.", '
+        '"urgency": "warn", '
+        '"actions": [ '
+        '{ "title": "Review SAP Policy Online", "description": "Log in to portal.", "estimated_minutes": 2 }, '
+        '{ "title": "Explore Tutoring", "description": "Enroll in tutoring.", "url": "https://www.you'
+    )
+    result = _parse_partial_json(truncated, "aid_risk")
+    assert result["title"] == "GPA Near Financial Aid Minimum — Act Before You Fall Below 2.0"
+    assert result["description"] == "Your cumulative GPA of 2.12 is only 0.12 points above the federal floor."
+    assert result["urgency"] == "warn"
+    assert len(result["actions"]) == 1
+    assert result["actions"][0]["title"] == "Review SAP Policy Online"

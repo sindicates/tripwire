@@ -14,10 +14,14 @@ judges, advisors, and the student exactly which policy document the number came 
 from __future__ import annotations
 
 import json
+import logging
+import traceback
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 import anthropic
 from sqlalchemy import select
@@ -107,6 +111,18 @@ COOLDOWNS: dict[str, int] = {
     "satisfactory_academic_progress": 14,
     "enrollment_drop": 7,
 }
+
+
+_KNOWLEDGE_SYSTEM = (
+    "You are an expert academic advisor with deep knowledge of US university financial aid and "
+    "academic standing policies. Generate a specific, actionable response packet for a student "
+    "facing an academic risk. Use your training knowledge about the specific school's financial "
+    "aid office, academic policies, and standard processes for this risk type. Include exact "
+    "office names, typical form names, and standard contact channels for this institution. "
+    "If policy context documents are provided, prioritize that information. "
+    "Every action description starts with a verb: Email, Submit, Download, Call, Log in to, Book. "
+    "Output ONLY valid JSON — no prose before or after."
+)
 
 
 # ---------------------------------------------------------------------------
@@ -369,80 +385,125 @@ class RiskEngine:
         context: dict[str, Any],
         student: Student,
     ) -> dict[str, Any]:
-        """
-        Call Claude with retrieved policy chunks to produce a structured action packet.
-
-        Claude is called ONLY after a rule has already fired — never speculatively.
-        The action packet tells the student exactly what form to file, where, and by when.
-        """
-        student_snapshot = {
-            "gpa": student.gpa,
-            "credits_completed": student.credits_completed,
-            "credits_required": student.credits_required,
-            "major": student.major,
-            "aid_package": student.aid_package_json,
-        }
-
-        query = _risk_type_to_query(risk_type, context)
-        chunks = await self.rag.search(query, student.school_id, self.db, top_k=5)
-
-        chunk_text = "\n\n".join(
-            f"[Source: {c.get('page_url') or 'unknown'} | {c.get('section_heading') or ''}]\n{c['chunk_text']}"
-            for c in chunks
-        ) or "No policy documents available."
-
-        system = (
-            "You are Tripwire, an academic risk advisor. "
-            "Using the policy documents and student data provided, produce a JSON action packet. "
-            "Return ONLY valid JSON with this exact shape:\n"
-            '{"title": "...", "description": "...", "urgency": "info|warn|high|urgent", '
-            '"actions": [{"label": "...", "url": "...", "deadline": "YYYY-MM-DD or null"}], '
-            '"citations": ["url1", "url2"]}'
-        )
-
-        prompt = (
-            f"Risk type: {risk_type}\n"
-            f"Risk context: {json.dumps(context)}\n"
-            f"Student snapshot: {json.dumps(student_snapshot)}\n\n"
-            f"Policy documents:\n{chunk_text}"
-        )
-
+        """Knowledge-grounded action packet: single Claude call with any available pgvector chunks."""
         try:
-            message = await _anthropic_client().messages.create(
-                model=CLAUDE_MODEL,
-                max_tokens=1024,
-                system=system,
-                messages=[{"role": "user", "content": prompt}],
-            )
+            return await self._knowledge_action_packet(risk_type, context, student)
         except Exception:
+            logger.error(
+                "build_action_packet exception for risk_type=%s:\n%s",
+                risk_type,
+                traceback.format_exc(),
+            )
             return {
-                "title": f"Risk detected: {risk_type}",
-                "description": "Action plan unavailable — AI service unreachable.",
+                "title": f"Risk detected: {risk_type.replace('_', ' ').title()}",
+                "description": "Action plan temporarily unavailable. Please consult your financial aid office.",
                 "urgency": context.get("severity", "warn"),
                 "actions": [],
                 "citations": [],
             }
 
-        raw = message.content[0].text.strip()
-        # Strip markdown code fences if Claude wrapped the JSON
-        if raw.startswith("```"):
-            raw = raw.split("```")[1]
-            if raw.startswith("json"):
-                raw = raw[4:]
+    async def _knowledge_action_packet(
+        self,
+        risk_type: str,
+        context: dict[str, Any],
+        student: Student,
+    ) -> dict[str, Any]:
+        """Single Claude call using training knowledge + any pgvector chunks for this school."""
+        gpa = student.gpa
+        major = student.major or "undeclared"
+        school_name = student.school.name if student.school else "your university"
 
-        try:
-            return json.loads(raw)
-        except json.JSONDecodeError:
-            return {
-                "title": f"Risk detected: {risk_type}",
-                "description": raw,
-                "urgency": "warn",
-                "actions": [],
-                "citations": [],
-            }
+        student_snapshot = {
+            "gpa": gpa,
+            "credits_completed": student.credits_completed,
+            "credits_required": student.credits_required,
+            "major": major,
+            "aid_package": student.aid_package_json,
+        }
 
-    async def scan_student(self, student_id: uuid.UUID) -> list[RiskEvent]:
-        """Evaluate all rules for one student and persist any new risk events."""
+        query = _risk_type_to_query(risk_type, context)
+        chunks = await self.rag.search(query, student.school_id, self.db, top_k=3)
+
+        chunks_block = ""
+        if chunks:
+            chunks_block = (
+                f"\n\nPolicy context from {school_name} documents:\n"
+                + "\n\n".join(
+                    f"[{i + 1}] {c['section_heading'] or '(no heading)'}\n"
+                    f"{c['chunk_text']}\nSource: {c['page_url']}"
+                    for i, c in enumerate(chunks)
+                )
+            )
+
+        output_schema = (
+            "{\n"
+            '  "title": "Short headline (10 words max)",\n'
+            '  "description": "One sentence for the student",\n'
+            '  "urgency": "info|warn|high|urgent",\n'
+            '  "actions": [\n'
+            "    {\n"
+            '      "title": "3-5 word verb-first label (e.g. Email Financial Aid)",\n'
+            '      "description": "Imperative sentence with exact email, form name, phone, or URL",\n'
+            '      "url": "Verified URL from policy context, or null",\n'
+            '      "deadline": "YYYY-MM-DD or null",\n'
+            '      "office": "Office name plus email and phone",\n'
+            '      "estimated_minutes": 5,\n'
+            f'      "email_template": {{"subject": "Pre-filled subject", "body": "Pre-filled body referencing GPA={gpa}, major={major}. Use [Your Name] and [Student ID] for unknowns."}},\n'
+            '      "phone_script": "2-3 verbatim sentences to read aloud. Include [Your Name] and [Student ID]."\n'
+            "    }\n"
+            "  ],\n"
+            '  "citations": ["Source URLs from policy context, or standard school page URLs"]\n'
+            "}"
+        )
+
+        snapshot_lines = "\n".join(
+            f"  {k.replace('_', ' ').title()}: {v}"
+            for k, v in student_snapshot.items()
+            if v is not None
+        )
+
+        user_message = (
+            f"Risk: {risk_type.replace('_', ' ').upper()} at {school_name}\n\n"
+            f"Student snapshot:\n{snapshot_lines}"
+            f"{chunks_block}\n\n"
+            f"Using your knowledge of {school_name}'s financial aid office, academic policies, "
+            f"and standard {risk_type.replace('_', ' ')} processes at US universities, "
+            f"generate a specific action packet with at least 2 concrete action steps.\n\n"
+            f"Return JSON matching this schema:\n{output_schema}"
+        )
+
+        client = _anthropic_client()
+        response = await client.messages.create(
+            model=CLAUDE_MODEL,
+            max_tokens=4096,
+            system=_KNOWLEDGE_SYSTEM,
+            messages=[{"role": "user", "content": user_message}],
+        )
+        logger.info(
+            "_knowledge_action_packet stop_reason=%s risk_type=%s chunks=%d",
+            response.stop_reason, risk_type, len(chunks),
+        )
+
+        text_block = next((b for b in response.content if b.type == "text"), None)
+        if text_block:
+            return _parse_partial_json(text_block.text.strip(), risk_type)
+
+        logger.warning("_knowledge_action_packet returned no text block for risk_type=%s", risk_type)
+        return {
+            "title": f"Risk detected: {risk_type.replace('_', ' ').title()}",
+            "description": "Action plan temporarily unavailable. Please consult your financial aid office.",
+            "urgency": context.get("severity", "warn"),
+            "actions": [],
+            "citations": [c["page_url"] for c in chunks if c.get("page_url")],
+        }
+
+    async def scan_student(self, student_id: uuid.UUID, force: bool = False) -> list[RiskEvent]:
+        """Evaluate all rules for one student and persist any new risk events.
+
+        Args:
+            force: When True, bypasses cooldown checks so rules re-fire even if a
+                   recent unresolved event already exists. Use for manual re-scans.
+        """
         from sqlalchemy.orm import selectinload
         result = await self.db.execute(
             select(Student)
@@ -460,7 +521,7 @@ class RiskEngine:
         rule_results = _evaluate_rules(student, policy)
 
         for rule in rule_results:
-            if not await self._cooldown_ok(student.id, rule.risk_type):
+            if not force and not await self._cooldown_ok(student.id, rule.risk_type):
                 continue
 
             action_packet = await self.build_action_packet(
@@ -493,6 +554,110 @@ class RiskEngine:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+def _parse_partial_json(raw: str, risk_type: str = "aid_risk") -> dict[str, Any]:
+    # First, try standard json.loads
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        pass
+
+    import re
+
+    # If there's leading/trailing prose, extract the outermost JSON object and try again.
+    # This handles "Here's your action plan: {...}" responses where json.loads fails.
+    outer_match = re.search(r"\{[\s\S]*\}", raw)
+    if outer_match:
+        try:
+            return json.loads(outer_match.group())
+        except json.JSONDecodeError:
+            pass
+
+
+    str_pattern = r'"([^"\\]*(?:\\.[^"\\]*)*)"'
+    
+    title_match = re.search(r'"title"\s*:\s*' + str_pattern, raw)
+    desc_match = re.search(r'"description"\s*:\s*' + str_pattern, raw)
+    urgency_match = re.search(r'"urgency"\s*:\s*' + str_pattern, raw)
+    
+    title = f"Risk detected: {risk_type}"
+    if title_match:
+        try:
+            title = json.loads(f'"{title_match.group(1)}"')
+        except Exception:
+            title = title_match.group(1)
+        
+    description = raw
+    if desc_match:
+        try:
+            description = json.loads(f'"{desc_match.group(1)}"')
+        except Exception:
+            description = desc_match.group(1)
+        
+    urgency = "warn"
+    if urgency_match:
+        try:
+            urgency = json.loads(f'"{urgency_match.group(1)}"')
+        except Exception:
+            urgency = urgency_match.group(1)
+
+    actions = []
+    actions_match = re.search(r'"actions"\s*:\s*\[(.*)', raw, re.DOTALL)
+    if actions_match:
+        actions_str = actions_match.group(1)
+        brace_count = 0
+        in_string = False
+        escape_next = False
+        start_idx = -1
+        
+        for i, char in enumerate(actions_str):
+            if escape_next:
+                escape_next = False
+                continue
+            if char == '\\':
+                escape_next = True
+                continue
+            if char == '"':
+                in_string = not in_string
+                continue
+            if not in_string:
+                if char == '{':
+                    if brace_count == 0:
+                        start_idx = i
+                    brace_count += 1
+                elif char == '}':
+                    brace_count -= 1
+                    if brace_count == 0 and start_idx != -1:
+                        obj_str = actions_str[start_idx:i+1]
+                        try:
+                            action_obj = json.loads(obj_str)
+                            actions.append(action_obj)
+                        except json.JSONDecodeError:
+                            pass
+                        start_idx = -1
+
+    citations = []
+    citations_match = re.search(r'"citations"\s*:\s*\[(.*?)\]', raw, re.DOTALL)
+    if citations_match:
+        try:
+            citations = json.loads(f"[{citations_match.group(1)}]")
+        except json.JSONDecodeError:
+            citations_str = citations_match.group(1)
+            citations_found = re.findall(str_pattern, citations_str)
+            for c in citations_found:
+                try:
+                    citations.append(json.loads(f'"{c}"'))
+                except Exception:
+                    citations.append(c)
+            
+    return {
+        "title": title,
+        "description": description,
+        "urgency": urgency,
+        "actions": actions,
+        "citations": citations
+    }
+
 
 def _school_slug(name: str | None) -> str:
     """

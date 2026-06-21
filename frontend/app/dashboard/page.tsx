@@ -48,7 +48,8 @@ interface BackendStudent {
 }
 
 interface ActionStep {
-  label: string
+  title?: string
+  label?: string
   url: string | null
   deadline: string | null
 }
@@ -136,7 +137,7 @@ export default function SherpaDashboard() {
   const runScan = useCallback(async (studentId: string) => {
     setScanning(true)
     try {
-      const res = await fetch(`${API}/api/v1/students/${studentId}/scan`, { method: "POST" })
+      const res = await fetch(`${API}/api/v1/students/${studentId}/scan?force=true`, { method: "POST" })
       if (res.ok) {
         const newEvents: RiskEvent[] = await res.json()
         setRiskEvents(prev => {
@@ -257,30 +258,46 @@ function Sidebar({ activeNav, onNavClick, onSignOut, profile }: { activeNav: Nav
   const subtitle = [profile.school, profile.year].filter(Boolean).join(" · ") || "—"
 
   return (
-    <aside className="tw-sidebar" style={{ width: 220, minWidth: 220, background: "#1e3824", borderRight: "1px solid #2a5636", display: "flex", flexDirection: "column", position: "sticky", top: 0, height: "100vh", overflowY: "auto", flexShrink: 0 }}>
-      <a href="/" className="tw-sidebar-logo" style={{ display: "flex", alignItems: "center", gap: 10, padding: "28px 20px 32px", textDecoration: "none" }}>
-        <SherpaLogo size={44} />
-        <span className="sidebar-brand tw-sidebar-logo-text">Sherpa</span>
-      </a>
-      <nav style={{ flex: 1, padding: "0 10px", display: "flex", flexDirection: "column", gap: 2 }}>
-        {NAV_ITEMS.map(({ id, Icon, label }) => (
-          <button key={id} className={`tw-nav-link${activeNav === id ? " active" : ""}`} onClick={() => onNavClick(id)}>
-            <Icon size={15} strokeWidth={1.75} style={{ flexShrink: 0 }} />
-            <span className="tw-sidebar-label">{label}</span>
-          </button>
-        ))}
-      </nav>
-      <div className="tw-sidebar-user" style={{ padding: "16px 20px", borderTop: "1px solid #2a5636", display: "flex", flexDirection: "column", gap: 12 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ width: 34, height: 34, borderRadius: "50%", background: "linear-gradient(135deg, #b5b0a8, #2d6030)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Satoshi', sans-serif", fontWeight: 700, fontSize: 12, color: "#111e14", flexShrink: 0, letterSpacing: "0.03em" }}>{initials}</div>
-          <div className="tw-sidebar-user-text" style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: "#ffffff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</div>
-            <div style={{ fontSize: 11, color: "#9aafa0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{subtitle}</div>
+    <div className="tw-sidebar-wrapper">
+      <aside className="tw-sidebar">
+        <div className="tw-sidebar-content-wrapper">
+          <div style={{ width: 240, display: "flex", flexDirection: "column", minHeight: "100%", justifyContent: "space-between", flexShrink: 0 }}>
+            <div>
+              <a href="/" className="tw-sidebar-logo" style={{ display: "flex", alignItems: "center", gap: 10, padding: "28px 20px 32px", textDecoration: "none" }}>
+                <SherpaLogo size={44} />
+                <span className="sidebar-brand tw-sidebar-logo-text">Sherpa</span>
+              </a>
+              <nav style={{ padding: "0 10px", display: "flex", flexDirection: "column", gap: 2 }}>
+                {NAV_ITEMS.map(({ id, Icon, label }) => (
+                  <button key={id} className={`tw-nav-link${activeNav === id ? " active" : ""}`} onClick={() => onNavClick(id)}>
+                    <Icon size={15} strokeWidth={1.75} style={{ flexShrink: 0 }} />
+                    <span className="tw-sidebar-label">{label}</span>
+                  </button>
+                ))}
+              </nav>
+            </div>
+            <div className="tw-sidebar-user" style={{ padding: "16px 20px", borderTop: "1px solid #2a5636", display: "flex", flexDirection: "column", gap: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ width: 34, height: 34, borderRadius: "50%", background: "linear-gradient(135deg, #b5b0a8, #2d6030)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Satoshi', sans-serif", fontWeight: 700, fontSize: 12, color: "#111e14", flexShrink: 0, letterSpacing: "0.03em" }}>{initials}</div>
+                <div className="tw-sidebar-user-text" style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#ffffff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</div>
+                  <div style={{ fontSize: 11, color: "#9aafa0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{subtitle}</div>
+                </div>
+              </div>
+              <button className="tw-btn-ghost tw-sidebar-label" onClick={onSignOut} style={{ fontSize: 12, textAlign: "left", padding: "4px 0", color: "#9aafa0" }}>Sign out →</button>
+            </div>
           </div>
         </div>
-        <button className="tw-btn-ghost tw-sidebar-label" onClick={onSignOut} style={{ fontSize: 12, textAlign: "left", padding: "4px 0", color: "#9aafa0" }}>Sign out →</button>
-      </div>
-    </aside>
+
+        {/* Dynamic Indicators */}
+        <div className="tw-sidebar-indicator">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="m9 18 6-6-6-6"/>
+          </svg>
+        </div>
+        <div className="tw-sidebar-glow-strip" />
+      </aside>
+    </div>
   )
 }
 
@@ -297,16 +314,16 @@ function DashboardHeader({ profile, activeCount, onSignOut }: { profile: Supabas
         <h1 style={{ fontFamily: "'Merriweather', serif", fontWeight: 700, fontSize: 28, margin: 0, letterSpacing: "-0.3px", lineHeight: 1.2 }}>
           {greeting}{firstName ? `, ${firstName}` : ""}
         </h1>
-        <p style={{ color: "#9aafa0", margin: "8px 0 0", fontSize: 14, display: "flex", alignItems: "center", gap: 8 }}>
+        <p style={{ color: "#ffffff", margin: "8px 0 0", fontSize: 14, display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", background: activeCount > 0 ? "#facc15" : "#4ade80", boxShadow: `0 0 5px ${activeCount > 0 ? "#facc15" : "#4ade80"}` }} />
           {activeCount > 0 ? `${activeCount} risk${activeCount > 1 ? "s" : ""} need${activeCount === 1 ? "s" : ""} your attention` : "No active risks"}
         </p>
       </div>
       <button
         onClick={onSignOut}
-        style={{ background: "none", border: "1px solid #2a5636", borderRadius: 8, padding: "8px 14px", color: "#9aafa0", fontSize: 13, cursor: "pointer", transition: "border-color 0.15s ease, color 0.15s ease", whiteSpace: "nowrap", flexShrink: 0 }}
+        style={{ background: "none", border: "1px solid #2a5636", borderRadius: 8, padding: "8px 14px", color: "#ffffff", fontSize: 13, cursor: "pointer", transition: "border-color 0.15s ease, color 0.15s ease", whiteSpace: "nowrap", flexShrink: 0 }}
         onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#b5b0a8"; e.currentTarget.style.color = "#b5b0a8" }}
-        onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#2a5636"; e.currentTarget.style.color = "#9aafa0" }}
+        onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#2a5636"; e.currentTarget.style.color = "#ffffff" }}
       >Sign out</button>
     </div>
   )
@@ -341,7 +358,7 @@ function StatCards({ student, profile, status }: { student: BackendStudent | nul
       <div className="tw-card" style={{ padding: 24, borderRadius: 8 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
           <div>
-            <div style={{ fontSize: 11, color: "#9aafa0", textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 600, marginBottom: 6 }}>Current GPA</div>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.65)", textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 600, marginBottom: 6 }}>Current GPA</div>
             <div style={{ fontFamily: "'Merriweather', serif", fontWeight: 700, fontSize: 40, color: gpa != null ? gpaColor : "#9aafa0", lineHeight: 1 }}>
               {isLoading ? "—" : gpa != null ? gpa.toFixed(2) : "—"}
             </div>
@@ -351,7 +368,7 @@ function StatCards({ student, profile, status }: { student: BackendStudent | nul
           )}
         </div>
         <div style={{ marginTop: 18 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#9aafa0", marginBottom: 6 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "rgba(255,255,255,0.65)", marginBottom: 6 }}>
             <span>Aid floor: {AID_FLOOR.toFixed(1)}</span>
             {gpa != null && <span style={{ color: gpaColor }}>{gpa >= AID_FLOOR ? `+${(gpa - AID_FLOOR).toFixed(2)} above` : `${(gpa - AID_FLOOR).toFixed(2)} below`}</span>}
           </div>
@@ -365,10 +382,10 @@ function StatCards({ student, profile, status }: { student: BackendStudent | nul
       <div className="tw-card" style={{ padding: 24, borderRadius: 8 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
           <div>
-            <div style={{ fontSize: 11, color: "#9aafa0", textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 600, marginBottom: 6 }}>Credits Completed</div>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.65)", textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 600, marginBottom: 6 }}>Credits Completed</div>
             <div style={{ fontFamily: "'Merriweather', serif", fontWeight: 700, fontSize: 40, lineHeight: 1 }}>
               <span style={{ color: "#b5b0a8" }}>{isLoading ? "—" : done ?? "—"}</span>
-              {req && <span style={{ color: "#9aafa0", fontSize: 22, fontWeight: 400 }}> / {req}</span>}
+              {req && <span style={{ color: "rgba(255,255,255,0.55)", fontSize: 22, fontWeight: 400 }}> / {req}</span>}
             </div>
           </div>
           {creditPct != null && (
@@ -376,7 +393,7 @@ function StatCards({ student, profile, status }: { student: BackendStudent | nul
           )}
         </div>
         <div style={{ marginTop: 18 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#9aafa0", marginBottom: 6 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "rgba(255,255,255,0.65)", marginBottom: 6 }}>
             <span>Progress to degree</span>
             {remaining != null && <span>{remaining} remaining</span>}
           </div>
@@ -389,7 +406,7 @@ function StatCards({ student, profile, status }: { student: BackendStudent | nul
       {/* Financial Aid */}
       <div className="tw-card" style={{ padding: 24, borderRadius: 8 }}>
         <div>
-          <div style={{ fontSize: 11, color: "#9aafa0", textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 600, marginBottom: 8 }}>Financial Aid</div>
+          <div style={{ fontSize: 11, color: "rgba(255,255,255,0.65)", textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 600, marginBottom: 8 }}>Financial Aid</div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#4ade80", display: "inline-block", boxShadow: "0 0 8px rgba(74,222,128,0.7)", flexShrink: 0 }} />
             <span style={{ fontFamily: "'Merriweather', serif", fontWeight: 700, fontSize: 30, color: "#4ade80" }}>
@@ -399,11 +416,11 @@ function StatCards({ student, profile, status }: { student: BackendStudent | nul
         </div>
         <div style={{ marginTop: 18, paddingTop: 14, borderTop: "1px solid #2a5636", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
           <div>
-            <div style={{ fontSize: 11, color: "#9aafa0" }}>Next review</div>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.65)" }}>Next review</div>
             <div style={{ fontSize: 14, color: "#ffffff", fontWeight: 600, marginTop: 2 }}>{aidReview ?? "—"}</div>
           </div>
           <div>
-            <div style={{ fontSize: 11, color: "#9aafa0" }}>Aid type</div>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.65)" }}>Aid type</div>
             <div style={{ fontSize: 14, color: "#ffffff", fontWeight: 600, marginTop: 2 }}>{aidType ?? "—"}</div>
           </div>
         </div>
@@ -433,7 +450,7 @@ function RiskFeed({ events, status, scanning, studentId, onResolve, onScan }: {
             </span>
           )}
           {status === "offline" && (
-            <span style={{ fontSize: 11, color: "#9aafa0" }}>backend offline</span>
+            <span style={{ fontSize: 11, color: "#ffffff" }}>backend offline</span>
           )}
         </div>
         {status === "ok" && studentId && (
@@ -457,7 +474,7 @@ function RiskFeed({ events, status, scanning, studentId, onResolve, onScan }: {
       {status === "ok" && events.length === 0 && (
         <div style={{ border: "1px dashed #2a5636", borderRadius: 10, padding: "32px 24px", textAlign: "center" }}>
           <div style={{ fontSize: 14, color: "#4ade80", fontWeight: 600, marginBottom: 6 }}>No active risks</div>
-          <div style={{ fontSize: 13, color: "#9aafa0" }}>
+          <div style={{ fontSize: 13, color: "#ffffff" }}>
             {studentId
               ? <>Click <strong>Run scan</strong> above to check for new risks.</>
               : "Risks will appear here once detected."}
@@ -467,8 +484,8 @@ function RiskFeed({ events, status, scanning, studentId, onResolve, onScan }: {
 
       {status === "offline" && (
         <div style={{ border: "1px dashed #2a5636", borderRadius: 10, padding: "24px", textAlign: "center" }}>
-          <div style={{ fontSize: 13, color: "#9aafa0" }}>Start the FastAPI server to load live risk events.</div>
-          <div style={{ fontFamily: "monospace", fontSize: 11, color: "#4a6a52", marginTop: 8 }}>cd backend && uvicorn app.main:app --reload</div>
+          <div style={{ fontSize: 13, color: "#ffffff" }}>Start the FastAPI server to load live risk events.</div>
+          <div style={{ fontFamily: "monospace", fontSize: 11, color: "rgba(255,255,255,0.45)", marginTop: 8 }}>cd backend && uvicorn app.main:app --reload</div>
         </div>
       )}
 
@@ -483,9 +500,23 @@ function RiskFeed({ events, status, scanning, studentId, onResolve, onScan }: {
 
 function RiskCardItem({ event, onResolve }: { event: RiskEvent; onResolve: (id: string) => void }) {
   const s = SEV[event.severity] ?? SEV.warn
-  const packet = event.action_packet_json
+  // action_packet_json may be a string if it was double-serialized in older DB rows
+  const rawPacket = event.action_packet_json
+  const packet: ActionPacket | null = (() => {
+    if (!rawPacket) return null
+    if (typeof rawPacket === "string") { try { return JSON.parse(rawPacket) } catch { return null } }
+    return rawPacket as ActionPacket
+  })()
   const title = packet?.title ?? fmt(event.risk_type)
-  const description = packet?.description ?? JSON.stringify(event.context_json ?? {})
+  // Guard against legacy rows where description was accidentally stored as a JSON blob
+  const description = (() => {
+    const d = packet?.description
+    if (!d) return null
+    if (d.trim().startsWith("{")) {
+      try { const inner = JSON.parse(d); return inner.description ?? null } catch {}
+    }
+    return d
+  })()
 
   return (
     <div className="tw-risk-card" style={{ borderLeftColor: s.border, padding: "18px 22px" }}>
@@ -493,24 +524,36 @@ function RiskCardItem({ event, onResolve }: { event: RiskEvent; onResolve: (id: 
         <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#ffffff", lineHeight: 1.4, fontFamily: "'Merriweather', serif" }}>{title}</h3>
         <span style={{ background: s.badge, color: "#111e14", fontSize: 10, fontWeight: 800, padding: "3px 9px", borderRadius: 4, letterSpacing: "0.08em", flexShrink: 0, marginTop: 2 }}>{s.label}</span>
       </div>
-      <p style={{ margin: "0 0 16px", fontSize: 13, color: "#9aafa0", lineHeight: 1.65 }}>{description}</p>
+      {description && (
+        <p style={{ margin: "0 0 16px", fontSize: 13, color: "#9aafa0", lineHeight: 1.65 }}>{description}</p>
+      )}
       {packet?.actions && packet.actions.length > 0 && (
         <div style={{ marginBottom: 12, display: "flex", flexDirection: "column", gap: 4 }}>
-          {packet.actions.map((a, i) => (
+          {packet.actions.map((a, i) => {
+            const label = a.title ?? a.label
+            return (
             <div key={i} style={{ fontSize: 12, color: "#9aafa0", display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ color: s.border }}>→</span>
               {a.url ? (
-                <a href={a.url} target="_blank" rel="noreferrer" style={{ color: s.border, textDecoration: "none" }}>{a.label}</a>
-              ) : <span>{a.label}</span>}
+                <a href={a.url} target="_blank" rel="noreferrer" style={{ color: s.border, textDecoration: "none" }}>{label}</a>
+              ) : <span>{label}</span>}
               {a.deadline && <span style={{ color: "#4a6a52" }}>· due {a.deadline}</span>}
             </div>
-          ))}
+            )
+          })}
         </div>
       )}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         <button className="tw-btn-primary" style={{ fontSize: 12, padding: "6px 14px" }} onClick={() => onResolve(event.id)}>Resolve</button>
+        <button
+          className="tw-btn-ghost"
+          style={{ fontSize: 12, padding: "6px 14px", border: "1px solid rgba(42,86,54,0.6)", borderRadius: 6, color: "#ffffff", cursor: "pointer", background: "rgba(42,86,54,0.25)" }}
+          onClick={() => window.location.href = `/chat?risk_id=${event.id}`}
+        >
+          Talk to Advisor
+        </button>
         {packet?.citations?.[0] && (
-          <span style={{ fontSize: 11, color: "#4a6a52", alignSelf: "center" }}>Source: {packet.citations[0]}</span>
+          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.45)", alignSelf: "center" }}>Source: {packet.citations[0]}</span>
         )}
       </div>
     </div>
@@ -547,7 +590,7 @@ function deriveActions(events: RiskEvent[]): DerivedAction[] {
       }
       return steps.slice(0, 2).map((a, i) => ({
         id: `${e.id}-${i}`,
-        title: a.label,
+        title: a.title ?? a.label ?? fmt(e.risk_type),
         meta: [a.deadline ? `Due ${a.deadline}` : null, fmt(e.risk_type)].filter(Boolean).join(" · "),
         tag: s.label,
         tagColor: s.badge,
@@ -585,13 +628,13 @@ function ActionCenter({ events, status, onResolve }: { events: RiskEvent[]; stat
 
       {status === "loading" && (
         <div style={{ border: "1px dashed #2a5636", borderRadius: 10, padding: "24px", textAlign: "center" }}>
-          <div style={{ fontSize: 13, color: "#9aafa0" }}>Loading actions…</div>
+          <div style={{ fontSize: 13, color: "#ffffff" }}>Loading actions…</div>
         </div>
       )}
 
       {status === "ok" && actions.length === 0 && (
         <div style={{ border: "1px dashed #2a5636", borderRadius: 10, padding: "24px", textAlign: "center" }}>
-          <div style={{ fontSize: 13, color: "#9aafa0" }}>No pending actions — looking good.</div>
+          <div style={{ fontSize: 13, color: "#ffffff" }}>No pending actions — looking good.</div>
         </div>
       )}
 
@@ -610,7 +653,7 @@ function ActionCenter({ events, status, onResolve }: { events: RiskEvent[]; stat
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                     <span style={{ background: `${item.tagColor}20`, color: item.tagColor, fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 4, letterSpacing: "0.06em" }}>{item.tag}</span>
-                    <span style={{ fontSize: 12, color: "#9aafa0" }}>{item.meta}</span>
+                    <span style={{ fontSize: 12, color: "rgba(255,255,255,0.65)" }}>{item.meta}</span>
                   </div>
                 </div>
               </div>

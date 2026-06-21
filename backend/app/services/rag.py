@@ -168,6 +168,10 @@ class RAGService:
         )
         return [item.embedding for item in response.data]
 
+    async def embed_chunks(self, texts: list[str]) -> list[list[float]]:
+        """Embed list of texts."""
+        return await self._embed(texts)
+
     # ── Crawl-and-ingest ──────────────────────────────────────────────────────
 
     _POLICY_KEYWORDS = {
@@ -282,6 +286,102 @@ class RAGService:
                     school.last_ingested_at = datetime.now(timezone.utc)
                     await session.commit()
 
+    # ── Knowledge-only fallback ───────────────────────────────────────────────
+
+    def _knowledge_system(self, school_name: str) -> str:
+        return (
+            f"You are a knowledgeable academic advisor for {school_name}. "
+            "No indexed policy documents are currently available for this school. "
+            "Answer using your training knowledge of this institution's financial aid policies, "
+            "academic standing requirements, SAP policies, and appeal processes. "
+            "Be specific: name the likely financial aid office, typical form names, and standard procedures. "
+            "Prefix knowledge-based claims with 'Based on standard policy...' when you are not fully certain. "
+            "Write for a stressed undergraduate — no jargon, no hedging. "
+            "If and ONLY IF the answer requires a concrete action (a form, deadline, or office visit), "
+            "append a JSON block at the very end fenced with ```json:\n"
+            "```json\n"
+            '{"title": "Short action title", "description": "One-sentence summary", '
+            '"actions": [{"label": "Step text", "url": null, "deadline": null, "office": "Office name"}]}\n'
+            "```\n"
+            "Omit the block entirely for purely informational answers."
+        )
+
+    async def _knowledge_only_answer(self, query: str, school_name: str) -> dict:
+        """Answer using Claude's training knowledge when no docs are ingested."""
+        try:
+            msg = await self._get_anthropic().messages.create(
+                model="claude-sonnet-4-6",
+                max_tokens=1500,
+                system=self._knowledge_system(school_name),
+                messages=[{"role": "user", "content": query}],
+            )
+            full_text = msg.content[0].text
+            action_packet = None
+            action_match = re.search(r"```json\s*(.*?)```", full_text, re.DOTALL)
+            if action_match:
+                try:
+                    action_packet = json.loads(action_match.group(1))
+                    prose = (
+                        full_text[: action_match.start()].rstrip()
+                        + full_text[action_match.end() :].lstrip()
+                    ).strip()
+                except json.JSONDecodeError:
+                    prose = full_text
+            else:
+                prose = full_text
+            return {"answer": prose, "citations": [], "action_packet": action_packet}
+        except Exception as e:
+            logging.getLogger("uvicorn").error(f"Knowledge-only answer error: {e}")
+            return {
+                "answer": (
+                    "The academic policy database is temporarily offline. Please try again later."
+                ),
+                "citations": [],
+                "action_packet": None,
+            }
+
+    async def _stream_knowledge_only(
+        self, query: str, school_name: str
+    ) -> AsyncGenerator[dict, None]:
+        """Stream a knowledge-only answer when no docs are ingested."""
+        _log = logging.getLogger("uvicorn")
+        try:
+            full_text = ""
+            async with self._get_anthropic().messages.stream(
+                model="claude-sonnet-4-6",
+                max_tokens=1500,
+                system=self._knowledge_system(school_name),
+                messages=[{"role": "user", "content": query}],
+            ) as stream:
+                async for text in stream.text_stream:
+                    full_text += text
+                    yield {"type": "text", "text": text}
+
+            action_packet = None
+            prose = full_text
+            action_match = re.search(r"```json\s*(.*?)```", full_text, re.DOTALL)
+            if action_match:
+                try:
+                    action_packet = json.loads(action_match.group(1))
+                    prose = (
+                        full_text[: action_match.start()].rstrip()
+                        + full_text[action_match.end() :].lstrip()
+                    ).strip()
+                except json.JSONDecodeError:
+                    pass
+            yield {
+                "type": "done",
+                "final_text": prose,
+                "citations": [],
+                "action_packet": action_packet,
+            }
+        except Exception as e:
+            _log.error(f"Knowledge-only stream error: {e}")
+            yield {
+                "type": "error",
+                "message": "The academic policy database is temporarily offline. Please try again later.",
+            }
+
     # ── Retrieval ─────────────────────────────────────────────────────────────
 
     async def search(
@@ -297,14 +397,46 @@ class RAGService:
 
         try:
             [q_emb] = await self._embed([query])
-            distance_col = DocChunk.embedding.cosine_distance(q_emb)
-            stmt = (
-                select(DocChunk, distance_col.label("distance"))
-                .where(DocChunk.school_id == school_id)
-                .order_by(distance_col)
-                .limit(top_k * 3)
-            )
-            rows = (await session.execute(stmt)).all()
+
+            is_sqlite = session.bind.dialect.name == "sqlite"
+            if is_sqlite:
+                # Fetch all chunks for this school
+                stmt = select(DocChunk).where(DocChunk.school_id == school_id)
+                chunks = (await session.execute(stmt)).scalars().all()
+
+                import numpy as np
+                def cosine_similarity(v1, v2):
+                    if v1 is None or v2 is None:
+                        return 0.0
+                    a1 = np.asarray(v1)
+                    a2 = np.asarray(v2)
+                    if a1.shape != a2.shape or a1.size == 0:
+                        return 0.0
+                    dot_product = np.dot(a1, a2)
+                    norm1 = np.linalg.norm(a1)
+                    norm2 = np.linalg.norm(a2)
+                    if norm1 == 0.0 or norm2 == 0.0:
+                        return 0.0
+                    return float(dot_product / (norm1 * norm2))
+
+                rows = []
+                for chunk in chunks:
+                    sim = cosine_similarity(chunk.embedding, q_emb)
+                    distance = 1.0 - sim
+                    rows.append((chunk, distance))
+
+                # Sort by distance and limit
+                rows.sort(key=lambda r: r[1])
+                rows = rows[:top_k * 3]
+            else:
+                distance_col = DocChunk.embedding.cosine_distance(q_emb)
+                stmt = (
+                    select(DocChunk, distance_col.label("distance"))
+                    .where(DocChunk.school_id == school_id)
+                    .order_by(distance_col)
+                    .limit(top_k * 3)
+                )
+                rows = (await session.execute(stmt)).all()
         except Exception:
             return []
 
@@ -344,35 +476,22 @@ class RAGService:
         school_id: uuid.UUID,
         school_name: str,
         session: AsyncSession,
+        risk_id: uuid.UUID | None = None,
     ) -> dict:
         """Return {answer, citations} grounded in retrieved policy chunks."""
-        # 1. Check if there are any chunks for this school in DB first, to avoid
-        # unnecessary OpenAI embedding API calls if no docs are ingested.
+        # 1. Check if docs exist. If not, answer from Claude's training knowledge directly
+        #    (avoids an unnecessary OpenAI embedding call when OPENAI_API_KEY may be blank).
         chunks_exist_result = await session.execute(
             select(DocChunk.id).where(DocChunk.school_id == school_id).limit(1)
         )
         if not chunks_exist_result.scalar():
-            return {
-                "answer": (
-                    "No policy documents have been ingested for this school yet. "
-                    "Ask an admin to submit a policy URL first."
-                ),
-                "citations": [],
-                "action_packet": None,
-            }
+            return await self._knowledge_only_answer(query, school_name)
 
         # 2. Search and generate answer, catching any external API quota/auth errors gracefully.
         try:
             chunks = await self.search(query, school_id, session)
             if not chunks:
-                return {
-                    "answer": (
-                        "No policy documents have been ingested for this school yet. "
-                        "Ask an admin to submit a policy URL first."
-                    ),
-                    "citations": [],
-                    "action_packet": None,
-                }
+                return await self._knowledge_only_answer(query, school_name)
 
             # 3. Dynamic subpage fetch: discover links from the school's financial aid URL,
             #    ask Claude which subpages are most likely to answer this question, fetch them live.
@@ -400,6 +519,28 @@ class RAGService:
             except Exception:
                 pass  # dynamic fetch is best-effort; fall back to pre-indexed chunks only
 
+            # Retrieve risk context if provided
+            risk_context_str = ""
+            if risk_id:
+                from app.models.risk_event import RiskEvent
+                result = await session.execute(
+                    select(RiskEvent).where(RiskEvent.id == risk_id)
+                )
+                event = result.scalar_one_or_none()
+                if event:
+                    packet = event.action_packet_json or {}
+                    risk_context_str = (
+                        f"Student Risk Context:\n"
+                        f"- Active Risk: {packet.get('title', event.risk_type)}\n"
+                        f"- Description: {packet.get('description', '')}\n"
+                        f"- Severity: {event.severity.value if hasattr(event.severity, 'value') else event.severity}\n"
+                        f"- Context Evidence: {json.dumps(event.context_json or {})}\n"
+                        f"- Suggested Action Steps:\n"
+                    )
+                    for action in packet.get("actions", []):
+                        risk_context_str += f"  * {action.get('label')} (Due: {action.get('deadline')}, Office: {action.get('office')})\n"
+                    risk_context_str += "\n"
+
             # Build context: pre-indexed chunks first, then live-fetched pages
             context_blocks = "\n\n".join(
                 f"[{i + 1}] {c['section_heading'] or '(no heading)'}\n"
@@ -412,6 +553,15 @@ class RAGService:
                 context_blocks += "\n\n" + "\n\n".join(
                     f"[{base + i + 1}] (live page)\n{d['text']}\nSource: {d['url']}"
                     for i, d in enumerate(dynamic_docs)
+                )
+
+            knowledge_supplement = ""
+            if len(chunks) < 2:
+                knowledge_supplement = (
+                    f"\n\nIMPORTANT: Only {len(chunks)} policy document chunk(s) were found for "
+                    f"{school_name}. Supplement with your training knowledge of this school's "
+                    "specific offices, form names, and standard processes. Flag any knowledge-based "
+                    "claims with 'Based on standard policy...' rather than citing a source URL."
                 )
 
             system = (
@@ -433,9 +583,10 @@ class RAGService:
                 "append a JSON block at the very end — after all prose — fenced with ```json:\n"
                 "```json\n"
                 '{"title": "Short action title", "description": "One-sentence summary", '
-                '"actions": [{"label": "Step text", "url": "https://...", "deadline": "YYYY-MM-DD", "office": "Office name"}]}\n'
+                '"actions": [{"label": "Step text", "url": "URL from the policy excerpts above or null if not found", "deadline": "YYYY-MM-DD or null", "office": "Office name"}]}\n'
                 "```\n"
-                "All action fields except label are optional. Omit the block entirely for purely informational answers."
+                "All action fields except label are optional. For 'url': only use a URL that appears verbatim in the policy excerpts above — never invent or guess a URL. Set to null if no real URL is available. Omit the block entirely for purely informational answers."
+                + knowledge_supplement
             )
 
             msg = await self._get_anthropic().messages.create(
@@ -446,7 +597,7 @@ class RAGService:
                     {
                         "role": "user",
                         "content": (
-                            f"Policy excerpts:\n{context_blocks}\n\nQuestion: {query}"
+                            f"{risk_context_str}Policy excerpts:\n{context_blocks}\n\nQuestion: {query}"
                         ),
                     }
                 ],
@@ -507,6 +658,7 @@ class RAGService:
         school_id: uuid.UUID,
         school_name: str,
         session: AsyncSession,
+        risk_id: uuid.UUID | None = None,
     ) -> AsyncGenerator[dict, None]:
         """Yield SSE-compatible dicts: {type:'text', text} chunks then a final {type:'done'} payload."""
         _log = logging.getLogger("uvicorn")
@@ -515,29 +667,15 @@ class RAGService:
             select(DocChunk.id).where(DocChunk.school_id == school_id).limit(1)
         )
         if not chunks_exist_result.scalar():
-            yield {
-                "type": "done",
-                "final_text": (
-                    "No policy documents have been ingested for this school yet. "
-                    "Ask an admin to submit a policy URL first."
-                ),
-                "citations": [],
-                "action_packet": None,
-            }
+            async for event in self._stream_knowledge_only(query, school_name):
+                yield event
             return
 
         try:
             chunks = await self.search(query, school_id, session)
             if not chunks:
-                yield {
-                    "type": "done",
-                    "final_text": (
-                        "No policy documents have been ingested for this school yet. "
-                        "Ask an admin to submit a policy URL first."
-                    ),
-                    "citations": [],
-                    "action_packet": None,
-                }
+                async for event in self._stream_knowledge_only(query, school_name):
+                    yield event
                 return
 
             # Dynamic subpage fetch (best-effort)
@@ -563,6 +701,28 @@ class RAGService:
             except Exception:
                 pass
 
+            # Retrieve risk context if provided
+            risk_context_str = ""
+            if risk_id:
+                from app.models.risk_event import RiskEvent
+                result = await session.execute(
+                    select(RiskEvent).where(RiskEvent.id == risk_id)
+                )
+                event = result.scalar_one_or_none()
+                if event:
+                    packet = event.action_packet_json or {}
+                    risk_context_str = (
+                        f"Student Risk Context:\n"
+                        f"- Active Risk: {packet.get('title', event.risk_type)}\n"
+                        f"- Description: {packet.get('description', '')}\n"
+                        f"- Severity: {event.severity.value if hasattr(event.severity, 'value') else event.severity}\n"
+                        f"- Context Evidence: {json.dumps(event.context_json or {})}\n"
+                        f"- Suggested Action Steps:\n"
+                    )
+                    for action in packet.get("actions", []):
+                        risk_context_str += f"  * {action.get('label')} (Due: {action.get('deadline')}, Office: {action.get('office')})\n"
+                    risk_context_str += "\n"
+
             context_blocks = "\n\n".join(
                 f"[{i + 1}] {c['section_heading'] or '(no heading)'}\n{c['chunk_text']}\nSource: {c['page_url']}"
                 for i, c in enumerate(chunks)
@@ -572,6 +732,15 @@ class RAGService:
                 context_blocks += "\n\n" + "\n\n".join(
                     f"[{base + i + 1}] (live page)\n{d['text']}\nSource: {d['url']}"
                     for i, d in enumerate(dynamic_docs)
+                )
+
+            knowledge_supplement = ""
+            if len(chunks) < 2:
+                knowledge_supplement = (
+                    f"\n\nIMPORTANT: Only {len(chunks)} policy document chunk(s) were found for "
+                    f"{school_name}. Supplement with your training knowledge of this school's "
+                    "specific offices, form names, and standard processes. Flag any knowledge-based "
+                    "claims with 'Based on standard policy...' rather than citing a source URL."
                 )
 
             system = (
@@ -593,9 +762,10 @@ class RAGService:
                 "append a JSON block at the very end — after all prose — fenced with ```json:\n"
                 "```json\n"
                 '{"title": "Short action title", "description": "One-sentence summary", '
-                '"actions": [{"label": "Step text", "url": "https://...", "deadline": "YYYY-MM-DD", "office": "Office name"}]}\n'
+                '"actions": [{"label": "Step text", "url": "URL from the policy excerpts above or null if not found", "deadline": "YYYY-MM-DD or null", "office": "Office name"}]}\n'
                 "```\n"
-                "All action fields except label are optional. Omit the block entirely for purely informational answers."
+                "All action fields except label are optional. For 'url': only use a URL that appears verbatim in the policy excerpts above — never invent or guess a URL. Set to null if no real URL is available. Omit the block entirely for purely informational answers."
+                + knowledge_supplement
             )
 
             full_text = ""
@@ -605,7 +775,7 @@ class RAGService:
                 system=system,
                 messages=[{
                     "role": "user",
-                    "content": f"Policy excerpts:\n{context_blocks}\n\nQuestion: {query}",
+                    "content": f"{risk_context_str}Policy excerpts:\n{context_blocks}\n\nQuestion: {query}",
                 }],
             ) as stream:
                 async for text in stream.text_stream:

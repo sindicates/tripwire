@@ -87,17 +87,22 @@ export interface DocChunk {
 }
 
 export interface ActionItem {
-  type: string
-  label: string
+  title: string
+  description: string
   url?: string
   deadline?: string
-  priority: "low" | "medium" | "high"
+  office?: string
+  estimated_minutes?: number
+  email_template?: { subject: string; body: string }
+  phone_script?: string
 }
 
 export interface ActionPacket {
   title: string
   description: string
+  urgency?: string
   actions: ActionItem[]
+  citations?: string[]
 }
 
 export interface RiskEvent {

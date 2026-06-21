@@ -13,6 +13,10 @@ import {
   RefreshCw,
   ChevronRight,
   ExternalLink,
+  Building2,
+  TrendingDown,
+  Clock,
+  CheckCircle2,
 } from "lucide-react"
 import type { LucideProps } from "lucide-react"
 
@@ -30,6 +34,9 @@ interface ActionItem {
   url?: string
   deadline?: string
   office?: string
+  estimated_minutes?: number
+  email_template?: { subject: string; body: string }
+  phone_script?: string
 }
 
 interface ActionPacket {
@@ -112,36 +119,52 @@ function Sidebar({ onNavClick, onSignOut, profile }: { onNavClick: (id: NavId) =
   const subtitle = [profile.school, profile.year].filter(Boolean).join(" · ") || "—"
 
   return (
-    <aside className="tw-sidebar" style={{ width: 220, minWidth: 220, background: "#1e3824", borderRight: "1px solid #2a5636", display: "flex", flexDirection: "column", position: "sticky", top: 0, height: "100vh", overflowY: "auto", flexShrink: 0 }}>
-      <a href="/" className="tw-sidebar-logo" style={{ display: "flex", alignItems: "center", gap: 10, padding: "28px 20px 32px", textDecoration: "none" }}>
-        <SherpaLogo size={44} />
-        <span className="sidebar-brand tw-sidebar-logo-text">Sherpa</span>
-      </a>
-      <nav style={{ flex: 1, padding: "0 10px", display: "flex", flexDirection: "column", gap: 2 }}>
-        {NAV_ITEMS.map(({ id, Icon, label }) => (
-          <button
-            key={id}
-            className={`tw-nav-link${id === "actions" ? " active" : ""}`}
-            onClick={() => onNavClick(id)}
-          >
-            <Icon size={15} strokeWidth={1.75} style={{ flexShrink: 0 }} />
-            <span className="tw-sidebar-label">{label}</span>
-          </button>
-        ))}
-      </nav>
-      <div className="tw-sidebar-user" style={{ padding: "16px 20px", borderTop: "1px solid #2a5636", display: "flex", flexDirection: "column", gap: 12 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ width: 34, height: 34, borderRadius: "50%", background: "linear-gradient(135deg, #b5b0a8, #2d6030)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Satoshi', sans-serif", fontWeight: 700, fontSize: 12, color: "#111e14", flexShrink: 0, letterSpacing: "0.03em" }}>
-            {initials}
-          </div>
-          <div className="tw-sidebar-user-text" style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: "#ffffff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</div>
-            <div style={{ fontSize: 11, color: "#9aafa0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{subtitle}</div>
+    <div className="tw-sidebar-wrapper">
+      <aside className="tw-sidebar">
+        <div className="tw-sidebar-content-wrapper">
+          <div style={{ width: 240, display: "flex", flexDirection: "column", minHeight: "100%", justifyContent: "space-between", flexShrink: 0 }}>
+            <div>
+              <a href="/" className="tw-sidebar-logo" style={{ display: "flex", alignItems: "center", gap: 10, padding: "28px 20px 32px", textDecoration: "none" }}>
+                <SherpaLogo size={44} />
+                <span className="sidebar-brand tw-sidebar-logo-text">Sherpa</span>
+              </a>
+              <nav style={{ padding: "0 10px", display: "flex", flexDirection: "column", gap: 2 }}>
+                {NAV_ITEMS.map(({ id, Icon, label }) => (
+                  <button
+                    key={id}
+                    className={`tw-nav-link${id === "actions" ? " active" : ""}`}
+                    onClick={() => onNavClick(id)}
+                  >
+                    <Icon size={15} strokeWidth={1.75} style={{ flexShrink: 0 }} />
+                    <span className="tw-sidebar-label">{label}</span>
+                  </button>
+                ))}
+              </nav>
+            </div>
+            <div className="tw-sidebar-user" style={{ padding: "16px 20px", borderTop: "1px solid #2a5636", display: "flex", flexDirection: "column", gap: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ width: 34, height: 34, borderRadius: "50%", background: "linear-gradient(135deg, #b5b0a8, #2d6030)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Satoshi', sans-serif", fontWeight: 700, fontSize: 12, color: "#111e14", flexShrink: 0, letterSpacing: "0.03em" }}>
+                  {initials}
+                </div>
+                <div className="tw-sidebar-user-text" style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#ffffff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</div>
+                  <div style={{ fontSize: 11, color: "#9aafa0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{subtitle}</div>
+                </div>
+              </div>
+              <button className="tw-btn-ghost tw-sidebar-label" onClick={onSignOut} style={{ fontSize: 12, textAlign: "left", padding: "4px 0", color: "#9aafa0" }}>Sign out →</button>
+            </div>
           </div>
         </div>
-        <button className="tw-btn-ghost tw-sidebar-label" onClick={onSignOut} style={{ fontSize: 12, textAlign: "left", padding: "4px 0", color: "#9aafa0" }}>Sign out →</button>
-      </div>
-    </aside>
+
+        {/* Dynamic Indicators */}
+        <div className="tw-sidebar-indicator">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="m9 18 6-6-6-6"/>
+          </svg>
+        </div>
+        <div className="tw-sidebar-glow-strip" />
+      </aside>
+    </div>
   )
 }
 
@@ -157,6 +180,7 @@ export default function ActionsPage() {
   const [filter,       setFilter]       = useState<Severity | "all">("all")
   const [studentId,    setStudentId]    = useState(DEMO_STUDENT_ID)
   const [profile,      setProfile]      = useState<Profile>({ display_name: null, school: null, year: null })
+  const [userEmail,    setUserEmail]    = useState("")
   const router = useRouter()
 
   useEffect(() => {
@@ -164,6 +188,7 @@ export default function ActionsPage() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push("/login"); return }
+      setUserEmail(user.email || "")
 
       const { data } = await supabase
         .from("students")
@@ -195,6 +220,7 @@ export default function ActionsPage() {
     else if (id === "advisor")  router.push("/chat")
     else if (id === "timeline") router.push("/deadline-radar")
     else if (id === "risk-feed") router.push("/dashboard")
+    else if (id === "settings") router.push("/settings")
   }
 
   const fetchEvents = useCallback(async () => {
@@ -320,6 +346,7 @@ export default function ActionsPage() {
                 resolving={resolving.has(event.id)}
                 onExpand={() => setExpandedId(expandedId === event.id ? null : event.id)}
                 onResolve={() => resolveEvent(event.id)}
+                userEmail={userEmail}
               />
             ))}
           </div>
@@ -356,6 +383,7 @@ export default function ActionsPage() {
                     resolving={false}
                     onExpand={() => {}}
                     onResolve={() => {}}
+                    userEmail={userEmail}
                     resolved
                   />
                 ))}
@@ -382,9 +410,10 @@ interface RiskEventCardProps {
   onExpand: () => void
   onResolve: () => void
   resolved?: boolean
+  userEmail: string
 }
 
-function RiskEventCard({ event, expanded, resolving, onExpand, onResolve, resolved = false }: RiskEventCardProps) {
+function RiskEventCard({ event, expanded, resolving, onExpand, onResolve, resolved = false, userEmail }: RiskEventCardProps) {
   const cfg    = SEVERITY_CONFIG[event.severity]
   const packet = event.action_packet_json
 
@@ -444,6 +473,14 @@ function RiskEventCard({ event, expanded, resolving, onExpand, onResolve, resolv
               </button>
             )}
             <button
+              onClick={() => window.location.href = `/chat?risk_id=${event.id}`}
+              style={{ padding: "7px 14px", borderRadius: 8, background: "rgba(42,86,54,0.25)", border: "1px solid rgba(42,86,54,0.6)", color: "#ffffff", fontSize: 12, fontWeight: 600, cursor: "pointer", transition: "all 0.15s ease" }}
+              onMouseEnter={e => { e.currentTarget.style.background = "rgba(42,86,54,0.4)" }}
+              onMouseLeave={e => { e.currentTarget.style.background = "rgba(42,86,54,0.25)" }}
+            >
+              Talk to Advisor
+            </button>
+            <button
               onClick={onResolve}
               disabled={resolving}
               style={{ padding: "7px 14px", borderRadius: 8, background: "transparent", border: "1px solid #2a5636", color: "#9aafa0", fontSize: 12, fontWeight: 600, cursor: resolving ? "not-allowed" : "pointer", opacity: resolving ? 0.5 : 1, transition: "all 0.15s ease" }}
@@ -463,15 +500,95 @@ function RiskEventCard({ event, expanded, resolving, onExpand, onResolve, resolv
       </div>
 
       {expanded && packet && !resolved && (
-        <ActionPacketDetail packet={packet} />
+        <ActionPacketDetail
+          packet={packet}
+          eventId={event.id}
+          userEmail={userEmail}
+          contextJson={event.context_json}
+          severity={event.severity}
+        />
       )}
     </div>
   )
 }
 
+// ── ICS helpers ───────────────────────────────────────────────────────────────
+
+function buildICS(summary: string, deadline: string, description: string): string {
+  const startDate = deadline.replace(/-/g, "")
+  const [y, m, d] = deadline.split("-").map(Number)
+  const next = new Date(y, m - 1, d + 1)
+  const endDate = `${next.getFullYear()}${String(next.getMonth() + 1).padStart(2, "0")}${String(next.getDate()).padStart(2, "0")}`
+  const now = new Date().toISOString().replace(/-/g, "").replace(/:/g, "").replace(/\./g, "").slice(0, 15) + "Z"
+  const uid = Math.random().toString(36).slice(2, 11) + "@sherpa"
+  const esc = (s: string) => s.replace(/\\/g, "\\\\").replace(/,/g, "\\,").replace(/;/g, "\\;").replace(/\n/g, "\\n")
+  return [
+    "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Sherpa//Action Center//EN",
+    "BEGIN:VEVENT",
+    `UID:${uid}`, `DTSTAMP:${now}`,
+    `DTSTART;VALUE=DATE:${startDate}`, `DTEND;VALUE=DATE:${endDate}`,
+    `SUMMARY:${esc(summary)}`, `DESCRIPTION:${esc(description)}`,
+    "BEGIN:VALARM", "TRIGGER:-P2D", "ACTION:DISPLAY", "DESCRIPTION:Sherpa reminder", "END:VALARM",
+    "END:VEVENT", "END:VCALENDAR",
+  ].join("\r\n")
+}
+
+function triggerICSDownload(ics: string, filename: string): void {
+  const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url; a.download = filename
+  document.body.appendChild(a); a.click()
+  document.body.removeChild(a); URL.revokeObjectURL(url)
+}
+
 // ── Action packet detail ──────────────────────────────────────────────────────
 
-function ActionPacketDetail({ packet }: { packet: ActionPacket }) {
+function ActionPacketDetail({ packet, eventId, userEmail }: { packet: ActionPacket; eventId: string; userEmail: string }) {
+  const [checkedSteps, setCheckedSteps] = useState<Set<number>>(() => {
+    if (typeof window === "undefined") return new Set()
+    try {
+      const saved = localStorage.getItem(`sherpa_checked_${eventId}`)
+      return new Set(JSON.parse(saved || "[]") as number[])
+    } catch { return new Set() }
+  })
+  const [expandedTemplate, setExpandedTemplate] = useState<number | null>(null)
+  const [copiedStep, setCopiedStep] = useState<number | null>(null)
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(`sherpa_checked_${eventId}`, JSON.stringify(Array.from(checkedSteps)))
+    } catch {}
+  }, [checkedSteps, eventId])
+
+  function toggleStep(idx: number) {
+    setCheckedSteps(prev => {
+      const next = new Set(prev)
+      if (next.has(idx)) next.delete(idx); else next.add(idx)
+      return next
+    })
+  }
+
+  async function copyText(text: string, idx: number) {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopiedStep(idx)
+      setTimeout(() => setCopiedStep(null), 2000)
+    } catch {}
+  }
+
+  const mailtoHref = (() => {
+    const subject = encodeURIComponent(`Your Sherpa action plan: ${packet.title}`)
+    let body = `Action Plan: ${packet.title}\n\n`
+    packet.actions.forEach((a, i) => {
+      body += `${i + 1}. ${a.title}\n   ${a.description}\n`
+      if (a.deadline) body += `   Due: ${a.deadline}\n`
+      if (a.url) body += `   ${a.url}\n`
+      body += "\n"
+    })
+    return `mailto:${userEmail}?subject=${subject}&body=${encodeURIComponent(body.slice(0, 1800))}`
+  })()
+
   return (
     <div style={{ borderTop: "1px solid #2a5636", paddingTop: 16, animation: "fadeIn 0.25s ease" }}>
       {packet.urgency && (
@@ -481,45 +598,155 @@ function ActionPacketDetail({ packet }: { packet: ActionPacket }) {
       )}
 
       {packet.actions && packet.actions.length > 0 && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: "#9aafa0", textTransform: "uppercase", letterSpacing: "0.07em" }}>Action Steps</div>
-          {packet.actions.map((action, idx) => (
-            <div key={idx} style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
-              <div style={{ width: 26, height: 26, borderRadius: "50%", background: "rgba(181,176,168,0.1)", border: "1px solid rgba(181,176,168,0.25)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "#b5b0a8", flexShrink: 0 }}>
-                {idx + 1}
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: "#ffffff", marginBottom: 4 }}>{action.title}</div>
-                {action.description && (
-                  <div style={{ fontSize: 13, color: "#9aafa0", lineHeight: 1.6, marginBottom: 8 }}>{action.description}</div>
-                )}
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                  {action.deadline && (
-                    <span style={{ fontSize: 11, background: "rgba(250,204,21,0.1)", color: "#facc15", border: "1px solid rgba(250,204,21,0.2)", padding: "3px 10px", borderRadius: 20 }}>
-                      Due: {action.deadline}
-                    </span>
+        <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: "#9aafa0", textTransform: "uppercase", letterSpacing: "0.07em" }}>Action Steps</div>
+            <a
+              href={mailtoHref}
+              style={{ fontSize: 11, color: "#9aafa0", textDecoration: "none", transition: "color 0.15s" }}
+              onMouseEnter={e => { e.currentTarget.style.color = "#b5b0a8" }}
+              onMouseLeave={e => { e.currentTarget.style.color = "#9aafa0" }}
+            >
+              Email me this plan →
+            </a>
+          </div>
+
+          {packet.actions.map((action, idx) => {
+            const checked = checkedSteps.has(idx)
+            const isExpanded = expandedTemplate === idx
+            const hasTemplate = !!action.email_template
+            const hasScript = !!action.phone_script
+
+            return (
+              <div
+                key={idx}
+                style={{
+                  display: "flex", gap: 14, alignItems: "flex-start",
+                  padding: "12px 0",
+                  borderBottom: idx < packet.actions.length - 1 ? "1px solid rgba(42,86,54,0.5)" : "none",
+                  opacity: checked ? 0.5 : 1,
+                  transition: "opacity 0.2s ease",
+                }}
+              >
+                <button
+                  onClick={() => toggleStep(idx)}
+                  aria-label={checked ? `Mark step ${idx + 1} incomplete` : `Mark step ${idx + 1} complete`}
+                  style={{
+                    width: 26, height: 26, borderRadius: "50%", flexShrink: 0, marginTop: 1,
+                    background: checked ? "rgba(74,222,128,0.15)" : "rgba(181,176,168,0.1)",
+                    border: checked ? "1px solid rgba(74,222,128,0.5)" : "1px solid rgba(181,176,168,0.25)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 12, fontWeight: 700,
+                    color: checked ? "#4ade80" : "#b5b0a8",
+                    cursor: "pointer", transition: "all 0.2s ease",
+                  }}
+                >
+                  {checked ? "✓" : idx + 1}
+                </button>
+
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 4 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: checked ? "#9aafa0" : "#ffffff", textDecoration: checked ? "line-through" : "none", transition: "all 0.2s" }}>
+                      {action.title}
+                    </div>
+                    {action.estimated_minutes && (
+                      <span style={{ fontSize: 11, color: "#4a6a52", flexShrink: 0, whiteSpace: "nowrap" }}>~{action.estimated_minutes} min</span>
+                    )}
+                  </div>
+
+                  {action.description && (
+                    <div style={{ fontSize: 13, color: "#9aafa0", lineHeight: 1.6, marginBottom: 8 }}>{action.description}</div>
                   )}
-                  {action.office && (
-                    <span style={{ fontSize: 11, background: "rgba(42,86,54,0.5)", color: "#9aafa0", padding: "3px 10px", borderRadius: 20 }}>
-                      {action.office}
-                    </span>
-                  )}
-                  {action.url && (
-                    <a
-                      href={action.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, padding: "3px 12px", borderRadius: 20, background: "rgba(181,176,168,0.1)", border: "1px solid rgba(181,176,168,0.25)", color: "#b5b0a8", textDecoration: "none", transition: "all 0.15s ease" }}
-                      onMouseEnter={e => { e.currentTarget.style.background = "rgba(181,176,168,0.2)"; e.currentTarget.style.color = "#ffffff" }}
-                      onMouseLeave={e => { e.currentTarget.style.background = "rgba(181,176,168,0.1)"; e.currentTarget.style.color = "#b5b0a8" }}
-                    >
-                      Open <ExternalLink size={10} strokeWidth={2} />
-                    </a>
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: action.deadline || action.office ? 8 : 0 }}>
+                    {action.deadline && (
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                        <span style={{ fontSize: 11, background: "rgba(250,204,21,0.1)", color: "#facc15", border: "1px solid rgba(250,204,21,0.2)", padding: "3px 10px", borderRadius: 20 }}>
+                          Due: {action.deadline}
+                        </span>
+                        <button
+                          onClick={() => triggerICSDownload(buildICS(`Sherpa: ${action.title}`, action.deadline!, action.description || ""), `sherpa-${eventId.slice(0, 8)}-${idx}.ics`)}
+                          style={{ fontSize: 11, color: "#9aafa0", background: "transparent", border: "none", cursor: "pointer", padding: 0, transition: "color 0.15s" }}
+                          onMouseEnter={e => { e.currentTarget.style.color = "#b5b0a8" }}
+                          onMouseLeave={e => { e.currentTarget.style.color = "#9aafa0" }}
+                        >
+                          + Add to calendar
+                        </button>
+                      </div>
+                    )}
+                    {action.office && (
+                      <div style={{ fontSize: 11, color: "#9aafa0" }}>🏢 {action.office}</div>
+                    )}
+                  </div>
+
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                    {(hasTemplate || hasScript) && (
+                      <button
+                        onClick={() => setExpandedTemplate(isExpanded ? null : idx)}
+                        style={{
+                          display: "inline-flex", alignItems: "center", gap: 4,
+                          fontSize: 11, padding: "4px 12px", borderRadius: 20,
+                          background: isExpanded ? "rgba(181,176,168,0.15)" : "rgba(181,176,168,0.07)",
+                          border: "1px solid rgba(181,176,168,0.25)", color: "#b5b0a8",
+                          cursor: "pointer", transition: "all 0.15s ease",
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.background = "rgba(181,176,168,0.2)" }}
+                        onMouseLeave={e => { e.currentTarget.style.background = isExpanded ? "rgba(181,176,168,0.15)" : "rgba(181,176,168,0.07)" }}
+                      >
+                        {hasTemplate
+                          ? (isExpanded ? "▲ Email draft" : "▾ Copy email draft")
+                          : (isExpanded ? "▲ Talking points" : "▾ Talking points")}
+                      </button>
+                    )}
+                    {action.url && (
+                      <a
+                        href={action.url} target="_blank" rel="noopener noreferrer"
+                        style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, padding: "4px 12px", borderRadius: 20, background: "rgba(181,176,168,0.07)", border: "1px solid rgba(181,176,168,0.25)", color: "#b5b0a8", textDecoration: "none", transition: "all 0.15s ease" }}
+                        onMouseEnter={e => { e.currentTarget.style.background = "rgba(181,176,168,0.2)"; e.currentTarget.style.color = "#ffffff" }}
+                        onMouseLeave={e => { e.currentTarget.style.background = "rgba(181,176,168,0.07)"; e.currentTarget.style.color = "#b5b0a8" }}
+                      >
+                        Open <ExternalLink size={10} strokeWidth={2} />
+                      </a>
+                    )}
+                  </div>
+
+                  {isExpanded && (hasTemplate || hasScript) && (
+                    <div style={{ marginTop: 10, padding: "12px 14px", background: "rgba(10,26,15,0.7)", border: "1px solid rgba(42,86,54,0.8)", borderRadius: 8, animation: "fadeIn 0.2s ease" }}>
+                      {hasTemplate && action.email_template && (
+                        <>
+                          <div style={{ fontSize: 11, color: "#4a6a52", fontWeight: 600, marginBottom: 4 }}>
+                            Subject: {action.email_template.subject}
+                          </div>
+                          <div style={{ fontSize: 12, color: "#9aafa0", lineHeight: 1.7, whiteSpace: "pre-wrap", marginBottom: 10 }}>
+                            {action.email_template.body}
+                          </div>
+                          <button
+                            onClick={() => copyText(`Subject: ${action.email_template!.subject}\n\n${action.email_template!.body}`, idx)}
+                            style={{ fontSize: 11, padding: "4px 12px", borderRadius: 6, cursor: "pointer", transition: "all 0.2s ease", background: copiedStep === idx ? "rgba(74,222,128,0.15)" : "rgba(181,176,168,0.1)", border: copiedStep === idx ? "1px solid rgba(74,222,128,0.4)" : "1px solid rgba(181,176,168,0.25)", color: copiedStep === idx ? "#4ade80" : "#b5b0a8" }}
+                          >
+                            {copiedStep === idx ? "Copied ✓" : "Copy to clipboard"}
+                          </button>
+                        </>
+                      )}
+                      {hasScript && action.phone_script && (
+                        <>
+                          <div style={{ fontSize: 12, color: "#9aafa0", lineHeight: 1.7, fontStyle: "italic", marginBottom: 10 }}>
+                            "{action.phone_script}"
+                          </div>
+                          <button
+                            onClick={() => copyText(action.phone_script!, idx)}
+                            style={{ fontSize: 11, padding: "4px 12px", borderRadius: 6, cursor: "pointer", transition: "all 0.2s ease", background: copiedStep === idx ? "rgba(74,222,128,0.15)" : "rgba(181,176,168,0.1)", border: copiedStep === idx ? "1px solid rgba(74,222,128,0.4)" : "1px solid rgba(181,176,168,0.25)", color: copiedStep === idx ? "#4ade80" : "#b5b0a8" }}
+                          >
+                            {copiedStep === idx ? "Copied ✓" : "Copy script"}
+                          </button>
+                        </>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 

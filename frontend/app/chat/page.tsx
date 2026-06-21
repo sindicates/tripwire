@@ -3,6 +3,8 @@
 import { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
+import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
 import {
   LayoutDashboard,
   AlertTriangle,
@@ -85,36 +87,52 @@ function Sidebar({ onNavClick, onSignOut, profile }: { onNavClick: (id: NavId) =
   const subtitle = [profile.school, profile.year].filter(Boolean).join(" · ") || "—"
 
   return (
-    <aside className="tw-sidebar" style={{ width: 220, minWidth: 220, background: "#1e3824", borderRight: "1px solid #2a5636", display: "flex", flexDirection: "column", position: "sticky", top: 0, height: "100vh", overflowY: "auto", flexShrink: 0 }}>
-      <a href="/" className="tw-sidebar-logo" style={{ display: "flex", alignItems: "center", gap: 10, padding: "28px 20px 32px", textDecoration: "none" }}>
-        <SherpaLogo size={44} />
-        <span className="sidebar-brand tw-sidebar-logo-text">Sherpa</span>
-      </a>
-      <nav style={{ flex: 1, padding: "0 10px", display: "flex", flexDirection: "column", gap: 2 }}>
-        {NAV_ITEMS.map(({ id, Icon, label }) => (
-          <button
-            key={id}
-            className={`tw-nav-link${id === "advisor" ? " active" : ""}`}
-            onClick={() => onNavClick(id)}
-          >
-            <Icon size={15} strokeWidth={1.75} style={{ flexShrink: 0 }} />
-            <span className="tw-sidebar-label">{label}</span>
-          </button>
-        ))}
-      </nav>
-      <div className="tw-sidebar-user" style={{ padding: "16px 20px", borderTop: "1px solid #2a5636", display: "flex", flexDirection: "column", gap: 12 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ width: 34, height: 34, borderRadius: "50%", background: "linear-gradient(135deg, #b5b0a8, #2d6030)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Satoshi', sans-serif", fontWeight: 700, fontSize: 12, color: "#111e14", flexShrink: 0, letterSpacing: "0.03em" }}>
-            {initials}
-          </div>
-          <div className="tw-sidebar-user-text" style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: "#ffffff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</div>
-            <div style={{ fontSize: 11, color: "#9aafa0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{subtitle}</div>
+    <div className="tw-sidebar-wrapper">
+      <aside className="tw-sidebar">
+        <div className="tw-sidebar-content-wrapper">
+          <div style={{ width: 240, display: "flex", flexDirection: "column", minHeight: "100%", justifyContent: "space-between", flexShrink: 0 }}>
+            <div>
+              <a href="/" className="tw-sidebar-logo" style={{ display: "flex", alignItems: "center", gap: 10, padding: "28px 20px 32px", textDecoration: "none" }}>
+                <SherpaLogo size={44} />
+                <span className="sidebar-brand tw-sidebar-logo-text">Sherpa</span>
+              </a>
+              <nav style={{ padding: "0 10px", display: "flex", flexDirection: "column", gap: 2 }}>
+                {NAV_ITEMS.map(({ id, Icon, label }) => (
+                  <button
+                    key={id}
+                    className={`tw-nav-link${id === "advisor" ? " active" : ""}`}
+                    onClick={() => onNavClick(id)}
+                  >
+                    <Icon size={15} strokeWidth={1.75} style={{ flexShrink: 0 }} />
+                    <span className="tw-sidebar-label">{label}</span>
+                  </button>
+                ))}
+              </nav>
+            </div>
+            <div className="tw-sidebar-user" style={{ padding: "16px 20px", borderTop: "1px solid #2a5636", display: "flex", flexDirection: "column", gap: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ width: 34, height: 34, borderRadius: "50%", background: "linear-gradient(135deg, #b5b0a8, #2d6030)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Satoshi', sans-serif", fontWeight: 700, fontSize: 12, color: "#111e14", flexShrink: 0, letterSpacing: "0.03em" }}>
+                  {initials}
+                </div>
+                <div className="tw-sidebar-user-text" style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#ffffff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</div>
+                  <div style={{ fontSize: 11, color: "#9aafa0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{subtitle}</div>
+                </div>
+              </div>
+              <button className="tw-btn-ghost tw-sidebar-label" onClick={onSignOut} style={{ fontSize: 12, textAlign: "left", padding: "4px 0", color: "#9aafa0" }}>Sign out →</button>
+            </div>
           </div>
         </div>
-        <button className="tw-btn-ghost tw-sidebar-label" onClick={onSignOut} style={{ fontSize: 12, textAlign: "left", padding: "4px 0", color: "#9aafa0" }}>Sign out →</button>
-      </div>
-    </aside>
+
+        {/* Dynamic Indicators */}
+        <div className="tw-sidebar-indicator">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="m9 18 6-6-6-6"/>
+          </svg>
+        </div>
+        <div className="tw-sidebar-glow-strip" />
+      </aside>
+    </div>
   )
 }
 
@@ -126,6 +144,7 @@ export default function ChatPage() {
   const [loading,   setLoading]   = useState(false)
   const [schoolId,  setSchoolId]  = useState(DEMO_SCHOOL_ID)
   const [profile,   setProfile]   = useState<Profile>({ display_name: null, school: null, year: null })
+  const [riskId,    setRiskId]    = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef  = useRef<HTMLTextAreaElement>(null)
   const router    = useRouter()
@@ -159,10 +178,32 @@ export default function ChatPage() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
 
-  // Pre-fill from URL ?q= param (linked from dashboard FAB)
+  // Pre-fill from URL params (linked from dashboard FAB or action links)
   useEffect(() => {
-    const q = new URLSearchParams(window.location.search).get("q")
-    if (q) sendMessage(q)
+    const params = new URLSearchParams(window.location.search)
+    const q = params.get("q")
+    const rId = params.get("risk_id")
+
+    if (q) {
+      sendMessage(q)
+    } else if (rId) {
+      setRiskId(rId)
+      async function loadRisk() {
+        try {
+          const res = await fetch(`${API_BASE}/api/v1/risk-events/${rId}`)
+          if (res.ok) {
+            const data = await res.json()
+            const packet = data.action_packet_json
+            const title = packet?.title || data.risk_type.replace(/_/g, ' ').toUpperCase()
+            const desc = packet?.description || ''
+            const actions = packet?.actions || []
+            const greeting = `Hello! I've loaded your academic warning for **${title}**${desc ? ` (${desc})` : ''}.\n\nUnder your school's policy, here are the suggested action steps to resolve this:\n${actions.map((a: any, i: number) => `${i+1}. **${a.label}**${a.deadline ? ` (due ${a.deadline})` : ''}`).join('\n')}\n\nLet's work together to resolve this. How can I help you get started, or would you like to discuss the requirements?`
+            setMessages([{ id: genId(), role: "assistant", content: greeting }])
+          }
+        } catch { /* ignore and let user start empty */ }
+      }
+      loadRisk()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -178,6 +219,7 @@ export default function ChatPage() {
     else if (id === "actions")  router.push("/actions")
     else if (id === "timeline") router.push("/deadline-radar")
     else if (id === "risk-feed") router.push("/dashboard")
+    else if (id === "settings") router.push("/settings")
   }
 
   async function sendMessage(question: string) {
@@ -193,7 +235,7 @@ export default function ChatPage() {
       const res = await fetch(`${API_BASE}/api/v1/chat/query`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ school_id: schoolId, question }),
+        body: JSON.stringify({ school_id: schoolId, question, risk_id: riskId }),
       })
       if (!res.ok) throw new Error(await res.text() || `HTTP ${res.status}`)
       const data = await res.json()
@@ -284,9 +326,52 @@ export default function ChatPage() {
         @keyframes spin    { from { transform: rotate(0deg)   } to { transform: rotate(360deg) } }
         @keyframes fadeIn  { from { opacity: 0; transform: translateY(8px) } to { opacity: 1; transform: translateY(0) } }
         @keyframes pulse   { 0%, 100% { opacity: 1 } 50% { opacity: 0.4 } }
+        .chat-md > *:first-child { margin-top: 0 !important; }
+        .chat-md > *:last-child  { margin-bottom: 0 !important; }
+        .chat-md ul li::marker, .chat-md ol li::marker { color: #9aafa0; }
       `}</style>
     </div>
   )
+}
+
+// ── Markdown components ───────────────────────────────────────────────────────
+
+const mdComponents: React.ComponentProps<typeof ReactMarkdown>["components"] = {
+  h1: ({ children }) => <h1 style={{ fontFamily: "'Merriweather', serif", fontWeight: 700, fontSize: 16, margin: "14px 0 6px", color: "#ffffff", letterSpacing: "-0.2px" }}>{children}</h1>,
+  h2: ({ children }) => <h2 style={{ fontFamily: "'Merriweather', serif", fontWeight: 700, fontSize: 15, margin: "12px 0 5px", color: "#ffffff", letterSpacing: "-0.2px" }}>{children}</h2>,
+  h3: ({ children }) => <h3 style={{ fontFamily: "'Satoshi', sans-serif", fontWeight: 700, fontSize: 14, margin: "10px 0 4px", color: "#ccc9c2" }}>{children}</h3>,
+  p:  ({ children }) => <p style={{ margin: "0 0 8px", fontSize: 14, lineHeight: 1.65, color: "inherit" }}>{children}</p>,
+  ul: ({ children }) => <ul style={{ margin: "4px 0 8px", paddingLeft: 18, fontSize: 14, lineHeight: 1.65, display: "flex", flexDirection: "column", gap: 3 }}>{children}</ul>,
+  ol: ({ children }) => <ol style={{ margin: "4px 0 8px", paddingLeft: 18, fontSize: 14, lineHeight: 1.65, display: "flex", flexDirection: "column", gap: 3 }}>{children}</ol>,
+  li: ({ children }) => <li style={{ color: "inherit" }}>{children}</li>,
+  strong: ({ children }) => <strong style={{ fontWeight: 700, color: "#ffffff" }}>{children}</strong>,
+  em: ({ children }) => <em style={{ fontStyle: "italic", color: "#ccc9c2" }}>{children}</em>,
+  hr: () => <hr style={{ border: "none", borderTop: "1px solid #2a5636", margin: "10px 0" }} />,
+  blockquote: ({ children }) => (
+    <blockquote style={{ borderLeft: "3px solid #b5b0a8", margin: "8px 0", padding: "4px 12px", background: "rgba(181,176,168,0.06)", borderRadius: "0 4px 4px 0", color: "#ccc9c2", fontSize: 13 }}>
+      {children}
+    </blockquote>
+  ),
+  code: ({ children, className }) => {
+    const isBlock = className?.includes("language-")
+    return isBlock
+      ? <code style={{ display: "block", background: "rgba(0,0,0,0.3)", borderRadius: 6, padding: "8px 12px", fontSize: 12, fontFamily: "monospace", color: "#9aafa0", overflowX: "auto", margin: "6px 0" }}>{children}</code>
+      : <code style={{ background: "rgba(181,176,168,0.1)", borderRadius: 3, padding: "1px 5px", fontSize: 12, fontFamily: "monospace", color: "#ccc9c2" }}>{children}</code>
+  },
+  table: ({ children }) => (
+    <div style={{ overflowX: "auto", margin: "8px 0" }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>{children}</table>
+    </div>
+  ),
+  thead: ({ children }) => <thead style={{ borderBottom: "1px solid #2a5636" }}>{children}</thead>,
+  th: ({ children }) => <th style={{ padding: "6px 10px", textAlign: "left", fontWeight: 700, color: "#9aafa0", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em" }}>{children}</th>,
+  td: ({ children }) => <td style={{ padding: "6px 10px", borderBottom: "1px solid rgba(42,86,54,0.5)", color: "#ffffff", verticalAlign: "top" }}>{children}</td>,
+  a: ({ href, children }) => (
+    <a href={href} target="_blank" rel="noopener noreferrer"
+      style={{ color: "#b5b0a8", textDecoration: "underline", textUnderlineOffset: 2 }}>
+      {children}
+    </a>
+  ),
 }
 
 // ── Empty state ───────────────────────────────────────────────────────────────
@@ -349,8 +434,10 @@ function MessageBubble({ message }: { message: Message }) {
           <ThinkingIndicator />
         ) : (
           <div style={{ background: message.error ? "rgba(251,146,60,0.08)" : "rgba(18,38,24,0.85)", border: `1px solid ${message.error ? "rgba(251,146,60,0.25)" : "#2a5636"}`, borderRadius: "18px 18px 18px 4px", padding: "14px 18px", maxWidth: "85%" }}>
-            <div style={{ fontSize: 14, lineHeight: 1.75, color: message.error ? "#fb923c" : "#ffffff", whiteSpace: "pre-wrap", fontFamily: "'Satoshi', sans-serif" }}>
-              {message.content}
+            <div className="chat-md" style={{ color: message.error ? "#fb923c" : "#ffffff" }}>
+              <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
+                {message.content}
+              </ReactMarkdown>
             </div>
             {message.citations && message.citations.length > 0 && (
               <CitationList citations={message.citations} />

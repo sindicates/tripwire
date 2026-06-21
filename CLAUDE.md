@@ -230,6 +230,57 @@ cd mobile && npx expo start                                     # Expo Go / simu
 
 ---
 
+### Interactive Advisor Context & Search-Discovery Agent (2026-06-21)
+
+**What it does:** Wires Dashboard & Action Center cards to the Advisor Chat with pre-seeded context, and implements a multi-category search discovery and crawl agent.
+
+**Advisor Context Routing:**
+- Added a "Talk to Advisor" button to both the **Dashboard** Risk Card (`frontend/app/dashboard/page.tsx`) and the **Action Center** expand card (`frontend/app/actions/page.tsx`).
+- These buttons route the student to `/chat?risk_id=<risk_event_id>`.
+- **Advisor Chat Page** (`frontend/app/chat/page.tsx`) detects `risk_id` URL param, fetches the specific `RiskEvent`, and initializes the chat with a customized greeting showing the risk title, description, and suggested action steps.
+- **FastAPI /query Endpoint & RAGService** (`backend/app/routers/chat.py` & `backend/app/services/rag.py`): Accepts optional `risk_id` in payload, loads the risk details, and prepends a detailed `Student Risk Context` block to the system context so Claude is fully grounded in the specific academic risk during Q&A.
+
+**Search-Discovery Agent** (`backend/scripts/discover_and_ingest.py`):
+- Automated script to discover policies for academic notice/probation and deadlines/calendars in addition to financial aid/SAP.
+- Performs targeted searches per category, filters domains to matching `.edu` sites, leverages Claude to rank/select the top 3-5 most relevant seed URLs, and crawls/ingests them into `doc_chunks`.
+
+**No new DB migrations. Optional `TAVILY_API_KEY` env var added to enable live searches in discovery script.**
+
+---
+
+### Fetch.ai uAgent Research Agent (2026-06-21)
+
+**What it does:** Replaces the in-process research step with a standalone Fetch.ai uAgent process that performs autonomous web research when a risk rule fires. The agent receives a `ResearchRequest` (risk type, school name, student snapshot), uses Tavily search and httpx page fetching to find exact form names, deadlines, contact info, and policy excerpts, and returns a structured `ResearchBundle`. The existing Claude synthesis step then converts this bundle into a specific, actionable packet — no more generic "contact your financial aid office" boilerplate.
+
+**Architecture:**
+- **uAgent process** (port 8001) — runs Claude tool-use loop with `search_web` + `fetch_page`, returns `ResearchBundle` via REST POST at `/rest/research`
+- **FastAPI backend** calls uAgent via HTTP (UAgentClient); if uAgent is down, falls back silently to in-process `ResearchAgent`
+- **No change** to Stage 2 (Claude synthesis call) or the risk rule engine
+
+**Where it lives:**
+- `backend/app/services/uagent_researcher.py` — Fetch.ai agent definition, message models, research loop
+- `backend/app/services/uagent_client.py` — HTTP client for FastAPI → uAgent communication
+- `backend/scripts/run_research_agent.py` — entry point to start the agent process
+- `backend/app/services/risk_engine.py` — updated `build_action_packet()` with uAgent-first + fallback
+
+**How to start:**
+```bash
+# Terminal 6 (alongside the existing 5 terminals)
+cd backend && python -m scripts.run_research_agent
+```
+
+**New dependencies:** `uagents>=0.17.0` (Fetch.ai agent framework)
+
+**New env vars (all have dev defaults):**
+- `UAGENT_SEED` — seed phrase for deterministic agent address (default: `sherpa-research-agent-dev`)
+- `UAGENT_PORT` — port the agent listens on (default: `8001`)
+- `UAGENT_ENDPOINT` — agent endpoint URL (default: `http://localhost:8001/submit`)
+- `UAGENT_TIMEOUT` — seconds to wait for research response (default: `45`)
+
+**No new DB migrations required.**
+
+---
+
 ## Design system (Sherpa Mountain Theme)
 
 The product was renamed **Sherpa** (from Tripwire). All user-facing text uses "Sherpa". Codebase folder/repo still named `tripwire`.
@@ -267,26 +318,19 @@ background: linear-gradient(180deg, #1a3320 0%, #252e2a 100%);
 /* Primary button — opposite direction: stone to vivid green */
 background: linear-gradient(135deg, #b5b0a8, #2d6030);
 
-/* Brand wordmark */
-background: linear-gradient(to right, #1e5228, #b5b0a8);
+/* Brand wordmark (on dark backgrounds) */
+background: linear-gradient(to right, #c8d5cb, #b5b0a8);
 ```
 
-### Sherpa logo SVG
+### Sherpa logo
 
-A React component — use wherever the brand mark is needed (sidebar, auth pages, mobile header, email templates, etc.). Do **not** use the 🏔️ emoji or any other placeholder.
+The logo lives at `frontend/public/logo.png`. Use an `<img>` tag — do **not** use the 🏔️ emoji or any inline SVG placeholder.
 
 ```tsx
-function SherpaLogo({ size = 26 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Sherpa">
-      <path d="M14 3L26 23H2L14 3Z" stroke="#b5b0a8" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
-      <path d="M14 3L10.5 11L14 9L17.5 11L14 3Z" fill="#b5b0a8" />
-    </svg>
-  )
-}
+<img src="/logo.png" width={44} height={44} alt="Sherpa" style={{ objectFit: "contain" }} />
 ```
 
-On light backgrounds swap stroke/fill to `#1e5228` (forest green). On dark backgrounds use `#b5b0a8` (stone) as shown above.
+Adjust `width`/`height` to context (44px sidebar, 32px navbar, 26px inline). Works on both dark and light backgrounds.
 
 No emojis anywhere in the UI — use Lucide React icons for all iconography (`lucide-react` is installed via shadcn/ui).
 
@@ -301,3 +345,25 @@ No emojis anywhere in the UI — use Lucide React icons for all iconography (`lu
 - `.tw-pill` — suggestion chip, stone hover
 - `.tw-fab` — floating action button, stone→green gradient
 - `.tw-chat-input:focus` — stone-colored focus ring
+
+---
+
+### Knowledge-Grounded Action Packets (2026-06-21)
+
+**What it does:** Makes Claude's training knowledge the primary source for action packets and chat Q&A, so the product generates specific, actionable output even when university pages are login-gated.
+
+**Risk engine** (`backend/app/services/risk_engine.py`):
+- Replaced the two-stage `ResearchAgent → _synthesize` pipeline with a single `_knowledge_action_packet()` call.
+- Fetches top-3 pgvector chunks (if any) and passes them alongside the student snapshot + risk type to Claude, which writes the full ActionPacket using its training knowledge of the school.
+- Removed dead `_synthesize()` function and `ResearchBundle` import.
+
+**Research agent** (`backend/app/services/research_agent.py`):
+- Added `ResearchAgent.knowledge_bundle()` classmethod — single Claude call that fills a `ResearchBundle` from training knowledge (no web access required).
+- Wired as the fallback at the end of `research()` instead of `ResearchBundle.empty()`, so the agentverse path also gets substantive output when web crawling fails.
+
+**RAG service** (`backend/app/services/rag.py`):
+- Added `_knowledge_system()`, `_knowledge_only_answer()`, and `_stream_knowledge_only()` helpers.
+- Replaced the two early "no documents" dead-end returns in `answer()` and `stream_answer()` with calls to these helpers — Claude now answers from training knowledge instead of refusing.
+- Added a `knowledge_supplement` string appended to the system prompt when `len(chunks) < 2`, telling Claude to supplement sparse retrieval with its knowledge of the school.
+
+**No new DB migrations or env vars required.**
