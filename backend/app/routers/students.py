@@ -57,6 +57,7 @@ class StudentOut(BaseModel):
     credits_attempted: int | None
     credits_required: int | None
     aid_package_json: dict[str, Any] | None
+    degree_audit_json: dict[str, Any] | None
 
     model_config = {"from_attributes": True}
 

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import {
@@ -32,6 +32,8 @@ export interface Deadline {
   actionUrl?: string
   relevantToProfile: boolean
   sourceDoc?: string
+  /** true = came from student's own degree_audit_json */
+  isPersonal?: boolean
 }
 
 type NavId = "dashboard" | "risk-feed" | "advisor" | "actions" | "timeline" | "settings"
@@ -44,7 +46,33 @@ interface Profile {
   year: string | null
 }
 
+interface BackendStudent {
+  id: string
+  school_id: string | null
+  gpa: number | null
+  credits_completed: number | null
+  credits_attempted: number | null
+  credits_required: number | null
+  degree_audit_json: {
+    credits_this_semester?: number
+    deadlines?: RawDeadline[]
+  } | null
+}
+
+interface RawDeadline {
+  name: string
+  date: string
+  source_url?: string
+  timezone?: string
+  category?: DeadlineCategory
+  description?: string
+  action_label?: string
+  action_url?: string
+}
+
 // ── Nav ───────────────────────────────────────────────────────────────────────
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
 const NAV_ITEMS: NavItem[] = [
   { id: "dashboard", Icon: LayoutDashboard, label: "Dashboard"     },
@@ -55,22 +83,189 @@ const NAV_ITEMS: NavItem[] = [
   { id: "settings",  Icon: Settings,        label: "Settings"      },
 ]
 
-// ── Seeded data ───────────────────────────────────────────────────────────────
+// ── Institutional fallback deadlines ──────────────────────────────────────────
+//
+// Used when a student has no degree_audit_json.deadlines yet, or to supplement
+// personal deadlines. Each entry is keyed by the school's backend name (lowercase).
 
-const SEEDED_DEADLINES: Deadline[] = [
-  { id: 1,  category: "financial-aid", urgency: "urgent",  dueDate: "2026-09-05", relevantToProfile: false, title: "SAP Appeal Deadline",             description: "If your Satisfactory Academic Progress was flagged last semester, this is the last day to submit a formal appeal with a documented academic plan. Approved appeals restore your financial aid eligibility.", actionLabel: "Download appeal form", sourceDoc: "Financial Aid Office – SAP Policy" },
-  { id: 2,  category: "academic",      urgency: "warning", dueDate: "2026-09-12", relevantToProfile: true,  title: "Add / Drop Deadline",              description: "Last day to add a new course or drop one without a 'W' on your transcript. After this date, withdrawals are recorded and may count against your SAP completion ratio.", sourceDoc: "Registrar – Academic Calendar 2026–27" },
-  { id: 3,  category: "academic",      urgency: "warning", dueDate: "2026-10-31", relevantToProfile: true,  title: "Withdrawal Deadline",              description: "Last day to withdraw from a course with a 'W' grade instead of an 'F'. Withdrawals still count toward your SAP pace calculation — more than one may put your aid at risk.", sourceDoc: "Registrar – Academic Calendar 2026–27" },
-  { id: 4,  category: "registration",  urgency: "warning", dueDate: "2026-11-04", relevantToProfile: true,  title: "Spring Registration Opens",        description: "Priority registration begins. Your window is assigned by credit count — register on day one to secure seats in high-demand courses. MATH 285 and CS 446 are already over 70% full.", actionLabel: "View schedule", sourceDoc: "Registrar – Academic Calendar 2026–27" },
-  { id: 5,  category: "housing",       urgency: "warning", dueDate: "2026-11-15", relevantToProfile: true,  title: "Spring Housing Application",       description: "On-campus housing applications for spring semester are due by this date. Late applications go on a waitlist. If you lose your housing assignment you may also lose any housing-tied scholarship funds.", actionLabel: "Apply for housing", sourceDoc: "Residential Life – Spring 2027 Housing Guide" },
-  { id: 6,  category: "financial-aid", urgency: "urgent",  dueDate: "2026-12-01", relevantToProfile: true,  title: "CSS Profile Deadline",             description: "Required for institutional aid from your school and some private scholarships. Separate from FAFSA. Missing it means losing access to school-funded grants that don't roll over.", actionLabel: "Open CSS Profile", actionUrl: "https://cssprofile.collegeboard.org", sourceDoc: "Financial Aid Office – CSS Profile Instructions" },
-  { id: 7,  category: "financial-aid", urgency: "urgent",  dueDate: "2027-01-01", relevantToProfile: true,  title: "FAFSA Renewal",                    description: "Your FAFSA for the upcoming academic year must be submitted by this date to remain eligible for federal aid. Missing it doesn't just delay your aid — it can cancel it entirely for the semester.", actionLabel: "Open FAFSA", actionUrl: "https://studentaid.gov", sourceDoc: "Financial Aid Office – Annual Deadlines (Fall 2026)" },
-  { id: 8,  category: "scholarship",   urgency: "warning", dueDate: "2027-02-01", relevantToProfile: true,  title: "Dean's Merit Scholarship Renewal", description: "You must maintain a 3.5 GPA and submit a one-page reflection essay to renew your merit award for next year. This covers $4,200 annually — missing it is not recoverable mid-year.", actionLabel: "Submit renewal", sourceDoc: "Scholarship Office – Renewal Requirements 2026" },
-  { id: 9,  category: "registration",  urgency: "warning", dueDate: "2027-02-01", relevantToProfile: false, title: "Graduation Application",            description: "Students graduating in May must submit a formal graduation application by this date. Late applications are processed the following semester, delaying your diploma and employer background checks.", actionLabel: "Apply to graduate", sourceDoc: "Registrar – Graduation Procedures" },
-  { id: 10, category: "internship",    urgency: "info",    dueDate: "2027-02-15", relevantToProfile: true,  title: "Summer Research Funding",          description: "The Undergraduate Research Office awards up to $3,500 in summer funding for faculty-mentored projects. Applications require a faculty sponsor and a one-page project proposal.", actionLabel: "View requirements", sourceDoc: "Undergraduate Research Office – Summer 2027 Awards" },
-  { id: 11, category: "scholarship",   urgency: "info",    dueDate: "2027-03-01", relevantToProfile: true,  title: "Gates Last Dollar Award",          description: "The Gates Last Dollar Award covers unmet financial need for eligible first-gen students near graduation. Strong candidate match based on your profile. Application is 3 short essays.", actionLabel: "Start application", sourceDoc: "Scholarship Office – External Awards Bulletin" },
-  { id: 12, category: "academic",      urgency: "info",    dueDate: "2027-05-01", relevantToProfile: false, title: "Major Declaration Deadline",       description: "Students must declare a major by the end of their sophomore year. Undeclared students are restricted from registering for upper-division courses and may lose priority advising access.", actionLabel: "Declare major", sourceDoc: "Academic Advising – Degree Requirements Handbook" },
+const INSTITUTIONAL_DEADLINES: Record<string, Omit<Deadline, "id">[]> = {
+  "university of california, berkeley": [
+    {
+      category: "financial-aid", urgency: "urgent", dueDate: "2026-03-02",
+      relevantToProfile: true,
+      title: "FAFSA CA Priority Deadline",
+      description: "To be considered for on-time financial aid at UC Berkeley, students must complete the FAFSA by the California priority deadline. Missing it does not disqualify you, but late filers may receive reduced aid packages.",
+      actionLabel: "Open FAFSA", actionUrl: "https://studentaid.gov",
+      sourceDoc: "UC Berkeley Financial Aid & Scholarships — FAFSA Completion Overview",
+    },
+    {
+      category: "academic", urgency: "warning", dueDate: "2026-08-28",
+      relevantToProfile: true,
+      title: "Fall 2026 Add / Drop Deadline",
+      description: "Last day to add or drop a course without a 'W' appearing on your transcript. After this date, drops are recorded as withdrawals and count against your SAP completion ratio.",
+      sourceDoc: "UC Berkeley Registrar — Academic Calendar 2026-27",
+    },
+    {
+      category: "academic", urgency: "info", dueDate: "2026-08-19",
+      relevantToProfile: true,
+      title: "Fall 2026 Instruction Begins",
+      description: "First day of instruction for Fall 2026 semester. Ensure all enrollment changes are finalized before classes begin.",
+      sourceDoc: "UC Berkeley Registrar — Academic Calendar 2026-27",
+    },
+  ],
+  "university of nevada, reno": [
+    {
+      category: "academic", urgency: "warning", dueDate: "2026-08-28",
+      relevantToProfile: true,
+      title: "Fall 2026 Add / Swap Deadline",
+      description: "The final day to add or swap classes without instructor permission. Adding or swapping after this date requires instructor permission, with a final hard deadline of September 2, 2026.",
+      sourceDoc: "UNR Registrar — Academic Calendar Fall 2026",
+    },
+    {
+      category: "financial-aid", urgency: "urgent", dueDate: "2027-03-01",
+      relevantToProfile: true,
+      title: "FAFSA Renewal Deadline",
+      description: "File your FAFSA renewal to maintain eligibility for federal and institutional aid for the upcoming academic year. Priority deadline to ensure your full award package.",
+      actionLabel: "Open FAFSA", actionUrl: "https://studentaid.gov",
+      sourceDoc: "UNR Financial Aid Office — SAP Policy",
+    },
+  ],
+  "university of pennsylvania": [
+    {
+      category: "financial-aid", urgency: "urgent", dueDate: "2026-12-01",
+      relevantToProfile: true,
+      title: "CSS Profile Deadline",
+      description: "Required for institutional aid from Penn and some private scholarships. Separate from FAFSA. Missing it means losing access to school-funded grants that don't roll over.",
+      actionLabel: "Open CSS Profile", actionUrl: "https://cssprofile.collegeboard.org",
+      sourceDoc: "Penn Student Financial Services — Satisfactory Academic Progress",
+    },
+    {
+      category: "financial-aid", urgency: "urgent", dueDate: "2027-01-15",
+      relevantToProfile: true,
+      title: "FAFSA Priority Deadline",
+      description: "Submit your FAFSA for the upcoming year by this date to be considered for all need-based Penn grants.",
+      actionLabel: "Open FAFSA", actionUrl: "https://studentaid.gov",
+      sourceDoc: "Penn Student Financial Services — Annual Deadlines",
+    },
+  ],
+  "case western reserve university": [
+    {
+      category: "financial-aid", urgency: "urgent", dueDate: "2026-12-01",
+      relevantToProfile: true,
+      title: "CSS Profile Deadline",
+      description: "Required for CWRU institutional aid. File by this date to be considered for all need-based grant programs.",
+      actionLabel: "Open CSS Profile", actionUrl: "https://cssprofile.collegeboard.org",
+      sourceDoc: "CWRU Student Financial Aid — SAP Policy",
+    },
+    {
+      category: "financial-aid", urgency: "urgent", dueDate: "2027-03-01",
+      relevantToProfile: true,
+      title: "FAFSA Priority Deadline",
+      description: "CWRU uses this date to determine priority consideration for federal, state, and institutional need-based aid. Late filers may have unmet need gaps.",
+      actionLabel: "Open FAFSA", actionUrl: "https://studentaid.gov",
+      sourceDoc: "CWRU Student Financial Aid — Annual Deadlines",
+    },
+  ],
+}
+
+// Generic fallbacks used for schools not in the map above
+const GENERIC_FALLBACKS: Omit<Deadline, "id">[] = [
+  {
+    category: "financial-aid", urgency: "urgent", dueDate: "2027-03-01",
+    relevantToProfile: true,
+    title: "FAFSA Priority Deadline",
+    description: "Submit your FAFSA for the upcoming year by your school's priority deadline to maximize your financial aid award.",
+    actionLabel: "Open FAFSA", actionUrl: "https://studentaid.gov",
+    sourceDoc: "Federal Student Aid",
+  },
+  {
+    category: "financial-aid", urgency: "warning", dueDate: "2026-09-05",
+    relevantToProfile: false,
+    title: "SAP Appeal Deadline",
+    description: "If your Satisfactory Academic Progress was flagged, this is the typical deadline to submit a formal appeal with a documented academic plan. Check your school's Financial Aid Office for the exact date.",
+    sourceDoc: "Federal SAP Requirements (34 CFR § 668.34)",
+  },
+  {
+    category: "academic", urgency: "warning", dueDate: "2026-09-12",
+    relevantToProfile: true,
+    title: "Add / Drop Deadline",
+    description: "Last day to add a new course or drop one without a 'W' on your transcript. After this date, withdrawals count against your SAP completion ratio.",
+    sourceDoc: "Registrar — Academic Calendar",
+  },
 ]
+
+// ── Helpers: category inference ───────────────────────────────────────────────
+
+const KEYWORD_TO_CAT: [string[], DeadlineCategory][] = [
+  [["fafsa", "css profile", "financial aid", "scholarship", "aid", "grant", "sap", "appeal"], "financial-aid"],
+  [["registration", "add", "drop", "swap", "enroll", "graduation", "graduate", "withdraw"], "registration"],
+  [["housing", "residential", "dormitory", "dorm"], "housing"],
+  [["merit", "scholarship", "award", "renewal"], "scholarship"],
+  [["academic", "instruction", "exam", "final", "midterm", "semester", "calendar", "class"], "academic"],
+  [["internship", "research", "co-op", "career", "summer", "funding", "fellowship"], "internship"],
+]
+
+function inferCategory(title: string, description?: string): DeadlineCategory {
+  const text = `${title} ${description ?? ""}`.toLowerCase()
+  for (const [keywords, cat] of KEYWORD_TO_CAT) {
+    if (keywords.some(k => text.includes(k))) return cat
+  }
+  return "academic"
+}
+
+function inferUrgency(dueDate: string): UrgencyLevel {
+  const days = Math.ceil((new Date(dueDate).getTime() - Date.now()) / 86_400_000)
+  if (days < 0)  return "info"    // past
+  if (days < 14) return "urgent"
+  if (days < 60) return "warning"
+  return "info"
+}
+
+// ── Build deadline list from backend data + school fallbacks ──────────────────
+
+function buildDeadlines(
+  student: BackendStudent | null,
+  schoolName: string | null,
+): Deadline[] {
+  let id = 1
+  const result: Deadline[] = []
+
+  // 1. Student's personal deadlines from degree_audit_json
+  if (student?.degree_audit_json?.deadlines?.length) {
+    for (const raw of student.degree_audit_json.deadlines) {
+      result.push({
+        id: id++,
+        category: raw.category ?? inferCategory(raw.name, raw.description),
+        title: raw.name,
+        description: raw.description ?? "Deadline from your academic record. Click to see full details.",
+        dueDate: raw.date,
+        urgency: inferUrgency(raw.date),
+        actionLabel: raw.action_label,
+        actionUrl: raw.action_url,
+        relevantToProfile: true,
+        sourceDoc: raw.source_url,
+        isPersonal: true,
+      })
+    }
+  }
+
+  // 2. Institutional deadlines for the student's school
+  const key = (schoolName ?? "").toLowerCase().trim()
+  const institutionalList =
+    INSTITUTIONAL_DEADLINES[key] ?? GENERIC_FALLBACKS
+
+  // Avoid duplicating personal deadlines that fall on the same date + title
+  const personalKeys = new Set(result.map(d => `${d.title}|${d.dueDate}`))
+  for (const inst of institutionalList) {
+    if (!personalKeys.has(`${inst.title}|${inst.dueDate}`)) {
+      result.push({ ...inst, id: id++ })
+    }
+  }
+
+  // Sort ascending
+  result.sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
+  return result
+}
 
 // ── Layout constants ──────────────────────────────────────────────────────────
 
@@ -112,9 +307,10 @@ interface LayoutItem extends Deadline {
 }
 
 function computeLayout(sorted: Deadline[]): LayoutItem[] {
+  if (sorted.length === 0) return []
   const minMs = new Date(sorted[0].dueDate).getTime()
   const maxMs = new Date(sorted[sorted.length - 1].dueDate).getTime()
-  const range  = maxMs - minMs
+  const range = maxMs - minMs || 1  // avoid div-by-zero when all on same day
   const placed: { x: number; above: boolean; level: number }[] = []
 
   return sorted.map((d, i) => {
@@ -167,9 +363,10 @@ function connectorY2(above: boolean, level: number) {
 }
 
 function getMonthMarkers(sorted: Deadline[]) {
+  if (sorted.length === 0) return []
   const minMs  = new Date(sorted[0].dueDate).getTime()
   const maxMs  = new Date(sorted[sorted.length - 1].dueDate).getTime()
-  const range  = maxMs - minMs
+  const range  = maxMs - minMs || 1
   const marks: { label: string; x: number; isYearStart: boolean }[] = []
   const cur = new Date(sorted[0].dueDate)
   cur.setDate(1); cur.setMonth(cur.getMonth() + 1)
@@ -230,13 +427,6 @@ function Sidebar({ onNavClick, profile }: { onNavClick: (id: NavId) => void; pro
             <div style={{ fontSize: 11, color: "#9aafa0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{subtitle}</div>
           </div>
         </div>
-        <button
-          className="tw-btn-ghost tw-sidebar-label"
-          onClick={() => onNavClick("dashboard")}
-          style={{ fontSize: 12, textAlign: "left", padding: "4px 0", color: "#9aafa0" }}
-        >
-          ← Back to dashboard
-        </button>
       </div>
     </aside>
   )
@@ -246,25 +436,44 @@ function Sidebar({ onNavClick, profile }: { onNavClick: (id: NavId) => void; pro
 
 export default function DeadlineRadarPage() {
   const router = useRouter()
-  const [profile, setProfile] = useState<Profile>({ display_name: null, school: null, year: null })
-  const [selectedId, setSelectedId] = useState<number | null>(null)
-  const [enabledCats, setEnabledCats] = useState<Set<DeadlineCategory>>(
+  const [profile,         setProfile]        = useState<Profile>({ display_name: null, school: null, year: null })
+  const [backendStudent,  setBackendStudent]  = useState<BackendStudent | null>(null)
+  const [backendStatus,   setBackendStatus]   = useState<"loading" | "ok" | "offline">("loading")
+  const [selectedId,      setSelectedId]      = useState<number | null>(null)
+  const [enabledCats,     setEnabledCats]     = useState<Set<DeadlineCategory>>(
     new Set(Object.keys(CAT) as DeadlineCategory[])
   )
 
+  // ── Data loading ────────────────────────────────────────────────────────────
   useEffect(() => {
-    async function loadProfile() {
+    async function init() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push("/login"); return }
-      const { data } = await supabase
+
+      // Load Supabase profile (display_name, school, year)
+      const { data: sbData } = await supabase
         .from("students")
         .select("display_name, school, year")
         .eq("user_id", user.id)
         .single()
-      if (data) setProfile(data as Profile)
+      if (sbData) setProfile(sbData as Profile)
+
+      // Load backend student (includes degree_audit_json)
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/students/by-supabase/${user.id}`)
+        if (res.ok) {
+          const student: BackendStudent = await res.json()
+          setBackendStudent(student)
+          setBackendStatus("ok")
+        } else {
+          setBackendStatus("ok")  // backend reachable but no student record yet — still show fallbacks
+        }
+      } catch {
+        setBackendStatus("offline")
+      }
     }
-    loadProfile()
+    init()
   }, [router])
 
   function handleNavClick(id: NavId) {
@@ -272,6 +481,7 @@ export default function DeadlineRadarPage() {
     else if (id === "advisor") router.push("/chat")
     else if (id === "actions") router.push("/actions")
     else if (id === "risk-feed") router.push("/dashboard")
+    else if (id === "settings") router.push("/settings")
   }
 
   function toggleCat(cat: DeadlineCategory) {
@@ -283,12 +493,20 @@ export default function DeadlineRadarPage() {
     if (selected && selected.category === cat && enabledCats.has(cat)) setSelectedId(null)
   }
 
-  const sorted       = [...SEEDED_DEADLINES].sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
-  const layout       = computeLayout(sorted)
+  // ── Deadline computation ────────────────────────────────────────────────────
+  // Memoised so it only recomputes when the student or Supabase profile changes.
+  const allDeadlines = useMemo(
+    () => buildDeadlines(backendStudent, profile.school),
+    [backendStudent, profile.school]
+  )
+
+  const sorted        = allDeadlines
+  const layout        = computeLayout(sorted)
   const visibleLayout = layout.filter(d => enabledCats.has(d.category))
-  const months       = getMonthMarkers(sorted)
-  const selected     = visibleLayout.find(d => d.id === selectedId) ?? null
-  const TL_H         = SPINE_Y + GAP + CARD_H + STACK_GAP + CARD_H + 28
+  const months        = getMonthMarkers(sorted)
+  const selected      = visibleLayout.find(d => d.id === selectedId) ?? null
+  const TL_H          = SPINE_Y + GAP + CARD_H + STACK_GAP + CARD_H + 28
+  const personalCount = allDeadlines.filter(d => d.isPersonal).length
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: "linear-gradient(180deg, #2e5a3c 0%, #8faaa4 60%)", backgroundAttachment: "fixed", color: "#ffffff", fontFamily: "'Satoshi', sans-serif" }}>
@@ -303,160 +521,201 @@ export default function DeadlineRadarPage() {
             Upcoming Deadlines
           </h1>
           <p style={{ fontFamily: "'Satoshi', sans-serif", fontSize: 14, color: "#9aafa0", margin: 0 }}>
-            From official school sources. Click any event for details.
+            {backendStatus === "loading" && "Loading your deadlines…"}
+            {backendStatus === "offline" && "Showing general institutional deadlines — connect the backend for personalised ones."}
+            {backendStatus === "ok" && personalCount > 0
+              ? `${personalCount} deadline${personalCount !== 1 ? "s" : ""} from your academic record · institutional deadlines shown below.`
+              : backendStatus === "ok" && "Showing institutional deadlines. Upload a degree audit to see personalised dates."}
           </p>
         </div>
 
-        {/* Timeline card */}
-        <div className="tw-card" style={{ borderRadius: 8, overflow: "hidden", padding: 0 }}>
-
-          {/* Category filter */}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 0, borderBottom: "1px solid #2a5636", padding: "16px 24px" }}>
-            {(Object.keys(CAT) as DeadlineCategory[]).map(cat => {
-              const C = CAT[cat]
-              const active = enabledCats.has(cat)
-              return (
-                <button
-                  key={cat}
-                  onClick={() => toggleCat(cat)}
-                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 0", marginRight: 24, background: "none", border: "none", cursor: "pointer", transition: "opacity 0.15s", opacity: active ? 1 : 0.3 }}
-                >
-                  <span style={{ width: 7, height: 7, borderRadius: 1, background: C.color, display: "inline-block", flexShrink: 0 }} />
-                  <span style={{ fontFamily: "'Satoshi', sans-serif", fontSize: 12, fontWeight: 600, color: active ? C.color : "#4a6a52", whiteSpace: "nowrap" }}>
-                    {C.label}
-                  </span>
-                </button>
-              )
-            })}
+        {/* Loading skeleton */}
+        {backendStatus === "loading" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 24 }}>
+            {[1,2,3].map(i => (
+              <div key={i} style={{ height: 60, borderRadius: 8, background: "rgba(42,86,54,0.3)", animation: "pulse 1.5s ease infinite", opacity: 0.5 }} />
+            ))}
           </div>
+        )}
 
-          {/* Timeline canvas */}
-          <div style={{ overflowX: "auto", background: TL_BG }}>
-            <div style={{ position: "relative", width: TL_W, height: TL_H, minWidth: TL_W }}>
+        {/* Timeline card */}
+        {backendStatus !== "loading" && sorted.length > 0 && (
+          <div className="tw-card" style={{ borderRadius: 8, overflow: "hidden", padding: 0 }}>
 
-              {/* Month grid lines */}
-              {months.map(m => (
-                <div key={m.label} style={{ position: "absolute", left: m.x, top: 0, bottom: 0 }}>
-                  <div style={{ position: "absolute", top: 0, left: 0, width: m.isYearStart ? 2 : 1, height: "100%", background: m.isYearStart ? "#4a6a52" : "#2a5636", opacity: m.isYearStart ? 1 : 0.5 }} />
-                  <span style={{ position: "absolute", top: 8, left: 4, fontFamily: "'Satoshi', sans-serif", fontSize: m.isYearStart ? 12 : 10, color: m.isYearStart ? "#9aafa0" : "#4a6a52", fontWeight: m.isYearStart ? 700 : 600, textTransform: "uppercase", letterSpacing: "0.08em", whiteSpace: "nowrap" }}>
-                    {m.label}
-                  </span>
-                </div>
-              ))}
-
-              {/* Spine */}
-              <div style={{ position: "absolute", top: SPINE_Y, left: L_PAD - 20, right: R_PAD - 20, height: 1, background: "#2a5636" }} />
-
-              {/* Start / end labels */}
-              <span style={{ position: "absolute", top: SPINE_Y + 8, left: L_PAD - 20, fontFamily: "'Satoshi', sans-serif", fontSize: 10, color: "#4a6a52" }}>
-                {new Date(sorted[0].dueDate).toLocaleDateString("en-US", { month: "short", year: "numeric" })}
-              </span>
-              <span style={{ position: "absolute", top: SPINE_Y + 8, right: R_PAD - 20, fontFamily: "'Satoshi', sans-serif", fontSize: 10, color: "#4a6a52" }}>
-                {new Date(sorted[sorted.length - 1].dueDate).toLocaleDateString("en-US", { month: "short", year: "numeric" })}
-              </span>
-
-              {/* Items */}
-              {visibleLayout.map(d => {
-                const C   = CAT[d.category]
-                const top = cardTop(d.above, d.level)
-                const cY1 = connectorY1(d.above, d.level)
-                const cY2 = connectorY2(d.above, d.level)
-                const isSel = d.id === selectedId
-
+            {/* Category filter */}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 0, borderBottom: "1px solid #2a5636", padding: "16px 24px" }}>
+              {(Object.keys(CAT) as DeadlineCategory[]).map(cat => {
+                const C = CAT[cat]
+                const active = enabledCats.has(cat)
+                const count  = allDeadlines.filter(d => d.category === cat).length
                 return (
-                  <div key={d.id}>
-                    {/* Diamond dot */}
-                    <div style={{ position: "absolute", left: d.x - DOT_R, top: SPINE_Y - DOT_R, width: DOT_R * 2, height: DOT_R * 2, transform: "rotate(45deg)", background: isSel ? C.color : TL_BG, border: `2px solid ${C.color}`, zIndex: 2, transition: "background 0.15s" }} />
-
-                    {/* Connector */}
-                    <div style={{ position: "absolute", left: d.x, top: Math.min(cY1, cY2), width: 1, height: Math.abs(cY2 - cY1), background: isSel ? C.color : "#2a5636", transition: "background 0.15s" }} />
-
-                    {/* Card */}
-                    <div
-                      onClick={() => setSelectedId(isSel ? null : d.id)}
-                      style={{ position: "absolute", left: d.x - CARD_W / 2, top, width: CARD_W, height: CARD_H, background: isSel ? C.bg : "transparent", border: `1px solid ${isSel ? C.color : "#2a5636"}`, borderLeft: `3px solid ${C.color}`, borderRadius: 2, padding: "10px 11px", cursor: "pointer", overflow: "hidden", transition: "border-color 0.15s, background 0.15s", zIndex: 3, boxSizing: "border-box" }}
-                      onMouseEnter={e => { if (!isSel) { const el = e.currentTarget as HTMLDivElement; el.style.borderColor = C.color; el.style.background = C.bg } }}
-                      onMouseLeave={e => { if (!isSel) { const el = e.currentTarget as HTMLDivElement; el.style.borderColor = "#2a5636"; el.style.background = "transparent" } }}
-                    >
-                      <div style={{ fontFamily: "'Satoshi', sans-serif", fontSize: 9, fontWeight: 700, color: C.color, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 4 }}>
-                        {C.label}
-                      </div>
-                      <div style={{ fontFamily: "'Merriweather', serif", fontWeight: 700, fontSize: 11, color: "#ffffff", lineHeight: 1.35, marginBottom: 6, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-                        {d.title}
-                      </div>
-                      <div style={{ fontFamily: "'Satoshi', sans-serif", fontSize: 10, color: "#9aafa0" }}>
-                        {(() => { const days = daysUntil(d.dueDate); return days < 0 ? "Past" : days === 0 ? "Today" : `${days}d` })()}
-                        {" · "}{new Date(d.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                      </div>
-                    </div>
-                  </div>
+                  <button
+                    key={cat}
+                    onClick={() => toggleCat(cat)}
+                    style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 0", marginRight: 24, background: "none", border: "none", cursor: "pointer", transition: "opacity 0.15s", opacity: active ? 1 : 0.3 }}
+                  >
+                    <span style={{ width: 7, height: 7, borderRadius: 1, background: C.color, display: "inline-block", flexShrink: 0 }} />
+                    <span style={{ fontFamily: "'Satoshi', sans-serif", fontSize: 12, fontWeight: 600, color: active ? C.color : "#4a6a52", whiteSpace: "nowrap" }}>
+                      {C.label}
+                      {count > 0 && <span style={{ marginLeft: 4, opacity: 0.6 }}>({count})</span>}
+                    </span>
+                  </button>
                 )
               })}
             </div>
-          </div>
 
-          {/* Detail section */}
-          {selected && (() => {
-            const C    = CAT[selected.category]
-            const days = daysUntil(selected.dueDate)
-            return (
-              <div style={{ borderTop: "1px solid #2a5636", padding: "28px 24px 32px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
-                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: C.color, display: "inline-block", flexShrink: 0 }} />
-                  <span style={{ fontFamily: "'Satoshi', sans-serif", fontSize: 11, fontWeight: 700, color: C.color, textTransform: "uppercase", letterSpacing: "0.08em" }}>
-                    {C.label}
-                  </span>
-                  <span style={{ color: "#2a5636" }}>·</span>
-                  <span style={{ fontFamily: "'Satoshi', sans-serif", fontSize: 11, color: URGENCY_BADGE[selected.urgency].color }}>
-                    {URGENCY_BADGE[selected.urgency].label}
-                  </span>
-                  <span style={{ color: "#2a5636" }}>·</span>
-                  <span style={{ fontFamily: "'Satoshi', sans-serif", fontSize: 11, color: "#9aafa0" }}>
-                    {days < 0 ? "Past" : days === 0 ? "Due today" : `${days} days away`} — {formatDate(selected.dueDate)}
-                  </span>
-                  {!selected.relevantToProfile && (
-                    <>
-                      <span style={{ color: "#2a5636" }}>·</span>
-                      <span style={{ fontFamily: "'Satoshi', sans-serif", fontSize: 11, color: "#4a6a52", fontStyle: "italic" }}>may not apply to you</span>
-                    </>
-                  )}
-                  <button
-                    onClick={() => setSelectedId(null)}
-                    style={{ marginLeft: "auto", background: "none", border: "none", color: "#9aafa0", fontSize: 11, fontFamily: "'Satoshi', sans-serif", cursor: "pointer", padding: 0 }}
-                  >
-                    dismiss ✕
-                  </button>
-                </div>
+            {/* Timeline canvas */}
+            <div style={{ overflowX: "auto", background: TL_BG }}>
+              <div style={{ position: "relative", width: TL_W, height: TL_H, minWidth: TL_W }}>
 
-                <h2 style={{ fontFamily: "'Merriweather', serif", fontWeight: 700, fontSize: 22, margin: "0 0 12px", color: "#ffffff", letterSpacing: "-0.3px" }}>
-                  {selected.title}
-                </h2>
-                <p style={{ fontFamily: "'Satoshi', sans-serif", fontSize: 14, color: "#9aafa0", lineHeight: 1.8, margin: "0 0 20px", maxWidth: 640 }}>
-                  {selected.description}
-                </p>
-
-                <div style={{ display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap" }}>
-                  {selected.actionLabel && (
-                    <a
-                      href={selected.actionUrl ?? "#"}
-                      target={selected.actionUrl ? "_blank" : undefined}
-                      rel="noreferrer"
-                      style={{ fontFamily: "'Satoshi', sans-serif", fontWeight: 700, fontSize: 13, color: C.color, textDecoration: "none" }}
-                    >
-                      {selected.actionLabel} →
-                    </a>
-                  )}
-                  {selected.sourceDoc && (
-                    <span style={{ fontFamily: "'Satoshi', sans-serif", fontSize: 11, color: "#4a6a52" }}>
-                      Source: {selected.sourceDoc}
+                {/* Month grid lines */}
+                {months.map(m => (
+                  <div key={m.label} style={{ position: "absolute", left: m.x, top: 0, bottom: 0 }}>
+                    <div style={{ position: "absolute", top: 0, left: 0, width: m.isYearStart ? 2 : 1, height: "100%", background: m.isYearStart ? "#4a6a52" : "#2a5636", opacity: m.isYearStart ? 1 : 0.5 }} />
+                    <span style={{ position: "absolute", top: 8, left: 4, fontFamily: "'Satoshi', sans-serif", fontSize: m.isYearStart ? 12 : 10, color: m.isYearStart ? "#9aafa0" : "#4a6a52", fontWeight: m.isYearStart ? 700 : 600, textTransform: "uppercase", letterSpacing: "0.08em", whiteSpace: "nowrap" }}>
+                      {m.label}
                     </span>
-                  )}
-                </div>
+                  </div>
+                ))}
+
+                {/* Spine */}
+                <div style={{ position: "absolute", top: SPINE_Y, left: L_PAD - 20, right: R_PAD - 20, height: 1, background: "#2a5636" }} />
+
+                {/* Start / end labels */}
+                <span style={{ position: "absolute", top: SPINE_Y + 8, left: L_PAD - 20, fontFamily: "'Satoshi', sans-serif", fontSize: 10, color: "#4a6a52" }}>
+                  {new Date(sorted[0].dueDate).toLocaleDateString("en-US", { month: "short", year: "numeric" })}
+                </span>
+                <span style={{ position: "absolute", top: SPINE_Y + 8, right: R_PAD - 20, fontFamily: "'Satoshi', sans-serif", fontSize: 10, color: "#4a6a52" }}>
+                  {new Date(sorted[sorted.length - 1].dueDate).toLocaleDateString("en-US", { month: "short", year: "numeric" })}
+                </span>
+
+                {/* Items */}
+                {visibleLayout.map(d => {
+                  const C   = CAT[d.category]
+                  const top = cardTop(d.above, d.level)
+                  const cY1 = connectorY1(d.above, d.level)
+                  const cY2 = connectorY2(d.above, d.level)
+                  const isSel = d.id === selectedId
+
+                  return (
+                    <div key={d.id}>
+                      {/* Diamond dot — filled gold for personal deadlines */}
+                      <div style={{ position: "absolute", left: d.x - DOT_R, top: SPINE_Y - DOT_R, width: DOT_R * 2, height: DOT_R * 2, transform: "rotate(45deg)", background: isSel ? C.color : d.isPersonal ? C.color : TL_BG, border: `2px solid ${C.color}`, zIndex: 2, transition: "background 0.15s" }} />
+
+                      {/* Connector */}
+                      <div style={{ position: "absolute", left: d.x, top: Math.min(cY1, cY2), width: 1, height: Math.abs(cY2 - cY1), background: isSel ? C.color : "#2a5636", transition: "background 0.15s" }} />
+
+                      {/* Card */}
+                      <div
+                        onClick={() => setSelectedId(isSel ? null : d.id)}
+                        style={{ position: "absolute", left: d.x - CARD_W / 2, top, width: CARD_W, height: CARD_H, background: isSel ? C.bg : "transparent", border: `1px solid ${isSel ? C.color : "#2a5636"}`, borderLeft: `3px solid ${C.color}`, borderRadius: 2, padding: "10px 11px", cursor: "pointer", overflow: "hidden", transition: "border-color 0.15s, background 0.15s", zIndex: 3, boxSizing: "border-box" }}
+                        onMouseEnter={e => { if (!isSel) { const el = e.currentTarget as HTMLDivElement; el.style.borderColor = C.color; el.style.background = C.bg } }}
+                        onMouseLeave={e => { if (!isSel) { const el = e.currentTarget as HTMLDivElement; el.style.borderColor = "#2a5636"; el.style.background = "transparent" } }}
+                      >
+                        <div style={{ fontFamily: "'Satoshi', sans-serif", fontSize: 9, fontWeight: 700, color: C.color, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 4, display: "flex", alignItems: "center", gap: 4 }}>
+                          {C.label}
+                          {d.isPersonal && <span style={{ background: "rgba(181,176,168,0.2)", borderRadius: 2, padding: "1px 4px", fontSize: 8, color: "#b5b0a8" }}>yours</span>}
+                        </div>
+                        <div style={{ fontFamily: "'Merriweather', serif", fontWeight: 700, fontSize: 11, color: "#ffffff", lineHeight: 1.35, marginBottom: 6, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                          {d.title}
+                        </div>
+                        <div style={{ fontFamily: "'Satoshi', sans-serif", fontSize: 10, color: "#9aafa0" }}>
+                          {(() => { const days = daysUntil(d.dueDate); return days < 0 ? "Past" : days === 0 ? "Today" : `${days}d` })()}
+                          {" · "}{new Date(d.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
-            )
-          })()}
-        </div>
+            </div>
+
+            {/* Detail section */}
+            {selected && (() => {
+              const C    = CAT[selected.category]
+              const days = daysUntil(selected.dueDate)
+              return (
+                <div style={{ borderTop: "1px solid #2a5636", padding: "28px 24px 32px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
+                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: C.color, display: "inline-block", flexShrink: 0 }} />
+                    <span style={{ fontFamily: "'Satoshi', sans-serif", fontSize: 11, fontWeight: 700, color: C.color, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                      {C.label}
+                    </span>
+                    {selected.isPersonal && (
+                      <span style={{ fontSize: 10, background: "rgba(181,176,168,0.15)", color: "#b5b0a8", borderRadius: 4, padding: "2px 8px", border: "1px solid rgba(181,176,168,0.2)" }}>
+                        From your academic record
+                      </span>
+                    )}
+                    <span style={{ color: "#2a5636" }}>·</span>
+                    <span style={{ fontFamily: "'Satoshi', sans-serif", fontSize: 11, color: URGENCY_BADGE[selected.urgency].color }}>
+                      {URGENCY_BADGE[selected.urgency].label}
+                    </span>
+                    <span style={{ color: "#2a5636" }}>·</span>
+                    <span style={{ fontFamily: "'Satoshi', sans-serif", fontSize: 11, color: "#9aafa0" }}>
+                      {days < 0 ? "Past" : days === 0 ? "Due today" : `${days} days away`} — {formatDate(selected.dueDate)}
+                    </span>
+                    {!selected.relevantToProfile && (
+                      <>
+                        <span style={{ color: "#2a5636" }}>·</span>
+                        <span style={{ fontFamily: "'Satoshi', sans-serif", fontSize: 11, color: "#4a6a52", fontStyle: "italic" }}>may not apply to you</span>
+                      </>
+                    )}
+                    <button
+                      onClick={() => setSelectedId(null)}
+                      style={{ marginLeft: "auto", background: "none", border: "none", color: "#9aafa0", fontSize: 11, fontFamily: "'Satoshi', sans-serif", cursor: "pointer", padding: 0 }}
+                    >
+                      dismiss ✕
+                    </button>
+                  </div>
+
+                  <h2 style={{ fontFamily: "'Merriweather', serif", fontWeight: 700, fontSize: 22, margin: "0 0 12px", color: "#ffffff", letterSpacing: "-0.3px" }}>
+                    {selected.title}
+                  </h2>
+                  <p style={{ fontFamily: "'Satoshi', sans-serif", fontSize: 14, color: "#9aafa0", lineHeight: 1.8, margin: "0 0 20px", maxWidth: 640 }}>
+                    {selected.description}
+                  </p>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap" }}>
+                    {selected.actionLabel && (
+                      <a
+                        href={selected.actionUrl ?? "#"}
+                        target={selected.actionUrl ? "_blank" : undefined}
+                        rel="noreferrer"
+                        style={{ fontFamily: "'Satoshi', sans-serif", fontWeight: 700, fontSize: 13, color: C.color, textDecoration: "none" }}
+                      >
+                        {selected.actionLabel} →
+                      </a>
+                    )}
+                    <button
+                      onClick={() => window.location.href = `/chat?q=Help me understand the ${encodeURIComponent(selected.title)} deadline`}
+                      style={{ fontFamily: "'Satoshi', sans-serif", fontSize: 12, fontWeight: 600, color: "#ffffff", background: "rgba(42,86,54,0.3)", border: "1px solid rgba(42,86,54,0.6)", borderRadius: 6, padding: "6px 14px", cursor: "pointer" }}
+                    >
+                      Ask Advisor
+                    </button>
+                    {selected.sourceDoc && (
+                      <span style={{ fontFamily: "'Satoshi', sans-serif", fontSize: 11, color: "#4a6a52" }}>
+                        Source: {selected.sourceDoc}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )
+            })()}
+          </div>
+        )}
+
+        {/* Empty state when backend is offline */}
+        {backendStatus === "offline" && sorted.length === 0 && (
+          <div style={{ border: "1px dashed #2a5636", borderRadius: 10, padding: "40px 24px", textAlign: "center" }}>
+            <div style={{ fontSize: 14, color: "#9aafa0", marginBottom: 8 }}>Could not reach the backend to load your deadlines.</div>
+            <div style={{ fontFamily: "monospace", fontSize: 11, color: "#4a6a52" }}>cd backend && uvicorn app.main:app --reload</div>
+          </div>
+        )}
       </main>
+
+      <style>{`
+        @keyframes pulse { 0%, 100% { opacity: 0.5 } 50% { opacity: 0.2 } }
+      `}</style>
     </div>
   )
 }
