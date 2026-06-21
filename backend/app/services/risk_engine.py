@@ -32,8 +32,6 @@ from app.database import AsyncSessionLocal
 from app.models.risk_event import RiskEvent, Severity
 from app.models.student import Student
 from app.services.rag import RAGService
-from app.services.research_agent import ResearchAgent, ResearchBundle
-from app.services.uagent_client import UAgentClient
 
 CLAUDE_MODEL = "claude-sonnet-4-6"
 
@@ -115,21 +113,15 @@ COOLDOWNS: dict[str, int] = {
 }
 
 
-# ---------------------------------------------------------------------------
-# Synthesis prompt — Stage 2: single call, no tools
-# ---------------------------------------------------------------------------
-
-_SYNTHESIS_SYSTEM = (
-    "You are a financial aid and academic advisor writing a concrete action packet for a student. "
-    "Research has already been gathered for you — use it directly. Do not search for more information.\n\n"
-    "Rules:\n"
-    "1. Use the exact email and phone from contact_info — never say 'contact the office' without specifics.\n"
-    "2. Use exact form names from form_names — never say 'submit the appeal form'.\n"
-    "3. Use exact deadline dates from key_deadlines — never say 'within the deadline'.\n"
-    "4. If a field is null in the research bundle, say 'contact the financial aid office' for that specific part only.\n"
-    "5. Every action description starts with a verb: Email, Submit, Download, Call, Log in to, Book.\n"
-    "6. 'url' must come from visited_urls — null if the specific page wasn't fetched.\n"
-    "7. Output ONLY valid JSON — no prose before or after."
+_KNOWLEDGE_SYSTEM = (
+    "You are an expert academic advisor with deep knowledge of US university financial aid and "
+    "academic standing policies. Generate a specific, actionable response packet for a student "
+    "facing an academic risk. Use your training knowledge about the specific school's financial "
+    "aid office, academic policies, and standard processes for this risk type. Include exact "
+    "office names, typical form names, and standard contact channels for this institution. "
+    "If policy context documents are provided, prioritize that information. "
+    "Every action description starts with a verb: Email, Submit, Download, Call, Log in to, Book. "
+    "Output ONLY valid JSON — no prose before or after."
 )
 
 
@@ -393,59 +385,116 @@ class RiskEngine:
         context: dict[str, Any],
         student: Student,
     ) -> dict[str, Any]:
-        """
-        Two-stage action packet builder:
-          Stage 1 — Research: try uAgent first, fall back to direct ResearchAgent
-          Stage 2 — _synthesize() writes the action packet (single call, no tools)
-        """
-        student_snapshot = {
-            "gpa": student.gpa,
-            "credits_completed": student.credits_completed,
-            "credits_required": student.credits_required,
-            "major": student.major,
-            "aid_package": student.aid_package_json,
-        }
-
-        query = _risk_type_to_query(risk_type, context)
-        chunks = await self.rag.search(query, student.school_id, self.db, top_k=5)
-        seed_urls = [c["page_url"] for c in chunks if c.get("page_url")]
-        school_name = student.school.name if student.school else "your university"
-
-        research_kwargs = dict(
-            risk_type=risk_type,
-            school_name=school_name,
-            student_snapshot=student_snapshot,
-            seed_urls=seed_urls,
-        )
-
+        """Knowledge-grounded action packet: single Claude call with any available pgvector chunks."""
         try:
-            # Stage 1a — try uAgent (separate process, REST call)
-            try:
-                bundle = await UAgentClient().research(**research_kwargs)
-                logger.info("build_action_packet: uAgent returned bundle for risk_type=%s", risk_type)
-            except Exception as ua_exc:
-                # uAgent unreachable or errored — fall back to direct research
-                logger.warning(
-                    "build_action_packet: uAgent unavailable (%s), falling back to direct ResearchAgent",
-                    type(ua_exc).__name__,
-                )
-                bundle = await ResearchAgent().research(**research_kwargs)
-
-            # Stage 2 — synthesize action packet from research bundle
-            return await _synthesize(risk_type, context, student, bundle)
+            return await self._knowledge_action_packet(risk_type, context, student)
         except Exception:
             logger.error(
                 "build_action_packet exception for risk_type=%s:\n%s",
                 risk_type,
                 traceback.format_exc(),
             )
+            return {
+                "title": f"Risk detected: {risk_type.replace('_', ' ').title()}",
+                "description": "Action plan temporarily unavailable. Please consult your financial aid office.",
+                "urgency": context.get("severity", "warn"),
+                "actions": [],
+                "citations": [],
+            }
 
+    async def _knowledge_action_packet(
+        self,
+        risk_type: str,
+        context: dict[str, Any],
+        student: Student,
+    ) -> dict[str, Any]:
+        """Single Claude call using training knowledge + any pgvector chunks for this school."""
+        gpa = student.gpa
+        major = student.major or "undeclared"
+        school_name = student.school.name if student.school else "your university"
+
+        student_snapshot = {
+            "gpa": gpa,
+            "credits_completed": student.credits_completed,
+            "credits_required": student.credits_required,
+            "major": major,
+            "aid_package": student.aid_package_json,
+        }
+
+        query = _risk_type_to_query(risk_type, context)
+        chunks = await self.rag.search(query, student.school_id, self.db, top_k=3)
+
+        chunks_block = ""
+        if chunks:
+            chunks_block = (
+                f"\n\nPolicy context from {school_name} documents:\n"
+                + "\n\n".join(
+                    f"[{i + 1}] {c['section_heading'] or '(no heading)'}\n"
+                    f"{c['chunk_text']}\nSource: {c['page_url']}"
+                    for i, c in enumerate(chunks)
+                )
+            )
+
+        output_schema = (
+            "{\n"
+            '  "title": "Short headline (10 words max)",\n'
+            '  "description": "One sentence for the student",\n'
+            '  "urgency": "info|warn|high|urgent",\n'
+            '  "actions": [\n'
+            "    {\n"
+            '      "title": "3-5 word verb-first label (e.g. Email Financial Aid)",\n'
+            '      "description": "Imperative sentence with exact email, form name, phone, or URL",\n'
+            '      "url": "Verified URL from policy context, or null",\n'
+            '      "deadline": "YYYY-MM-DD or null",\n'
+            '      "office": "Office name plus email and phone",\n'
+            '      "estimated_minutes": 5,\n'
+            f'      "email_template": {{"subject": "Pre-filled subject", "body": "Pre-filled body referencing GPA={gpa}, major={major}. Use [Your Name] and [Student ID] for unknowns."}},\n'
+            '      "phone_script": "2-3 verbatim sentences to read aloud. Include [Your Name] and [Student ID]."\n'
+            "    }\n"
+            "  ],\n"
+            '  "citations": ["Source URLs from policy context, or standard school page URLs"]\n'
+            "}"
+        )
+
+        snapshot_lines = "\n".join(
+            f"  {k.replace('_', ' ').title()}: {v}"
+            for k, v in student_snapshot.items()
+            if v is not None
+        )
+
+        user_message = (
+            f"Risk: {risk_type.replace('_', ' ').upper()} at {school_name}\n\n"
+            f"Student snapshot:\n{snapshot_lines}"
+            f"{chunks_block}\n\n"
+            f"Using your knowledge of {school_name}'s financial aid office, academic policies, "
+            f"and standard {risk_type.replace('_', ' ')} processes at US universities, "
+            f"generate a specific action packet with at least 2 concrete action steps.\n\n"
+            f"Return JSON matching this schema:\n{output_schema}"
+        )
+
+        client = _anthropic_client()
+        response = await client.messages.create(
+            model=CLAUDE_MODEL,
+            max_tokens=4096,
+            system=_KNOWLEDGE_SYSTEM,
+            messages=[{"role": "user", "content": user_message}],
+        )
+        logger.info(
+            "_knowledge_action_packet stop_reason=%s risk_type=%s chunks=%d",
+            response.stop_reason, risk_type, len(chunks),
+        )
+
+        text_block = next((b for b in response.content if b.type == "text"), None)
+        if text_block:
+            return _parse_partial_json(text_block.text.strip(), risk_type)
+
+        logger.warning("_knowledge_action_packet returned no text block for risk_type=%s", risk_type)
         return {
             "title": f"Risk detected: {risk_type.replace('_', ' ').title()}",
             "description": "Action plan temporarily unavailable. Please consult your financial aid office.",
             "urgency": context.get("severity", "warn"),
             "actions": [],
-            "citations": [],
+            "citations": [c["page_url"] for c in chunks if c.get("page_url")],
         }
 
     async def scan_student(self, student_id: uuid.UUID, force: bool = False) -> list[RiskEvent]:
@@ -505,82 +554,6 @@ class RiskEngine:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-async def _synthesize(
-    risk_type: str,
-    context: dict[str, Any],
-    student: Student,
-    bundle: ResearchBundle,
-) -> dict[str, Any]:
-    """Single synthesis call — no tools. Turns a ResearchBundle into an ActionPacket JSON."""
-    gpa = student.gpa
-    major = student.major or "undeclared"
-    school_name = student.school.name if student.school else "your university"
-
-    bundle_json = json.dumps(
-        {
-            "appeal_process_text": bundle.appeal_process_text,
-            "form_names": bundle.form_names,
-            "key_deadlines": bundle.key_deadlines,
-            "contact_info": bundle.contact_info,
-            "policy_excerpts": bundle.policy_excerpts,
-            "visited_urls": bundle.visited_urls,
-        },
-        indent=2,
-    )
-
-    output_schema = (
-        "{\n"
-        '  "title": "Short headline (10 words max)",\n'
-        '  "description": "One sentence for the student",\n'
-        '  "urgency": "info|warn|high|urgent",\n'
-        '  "actions": [\n'
-        "    {\n"
-        '      "title": "3-5 word verb-first label (e.g. Email Financial Aid)",\n'
-        '      "description": "Imperative sentence with exact email, form name, phone, or URL from the research bundle",\n'
-        '      "url": "URL from visited_urls — null if not verified",\n'
-        '      "deadline": "YYYY-MM-DD parsed from key_deadlines, or null",\n'
-        '      "office": "Office name plus email and phone from contact_info",\n'
-        '      "estimated_minutes": 5,\n'
-        f'      "email_template": {{"subject": "Pre-filled subject", "body": "Pre-filled body with GPA={gpa}, major={major}. Use [Your Name] and [Student ID] for unknowns."}},\n'
-        '      "phone_script": "2-3 verbatim sentences to read aloud. Include [Your Name] and [Student ID]."\n'
-        "    }\n"
-        "  ],\n"
-        '  "citations": ["URLs from visited_urls that are most relevant"]\n'
-        "}"
-    )
-
-    user_message = (
-        f"Risk: {risk_type.replace('_', ' ').upper()} at {school_name}\n\n"
-        f"Research bundle:\n{bundle_json}\n\n"
-        f"Write the action packet JSON for this student:\n\n"
-        f"{output_schema}"
-    )
-
-    client = _anthropic_client()
-    response = await client.messages.create(
-        model=CLAUDE_MODEL,
-        max_tokens=4096,
-        system=_SYNTHESIS_SYSTEM,
-        messages=[{"role": "user", "content": user_message}],
-    )
-    logger.info(
-        "_synthesize stop_reason=%s risk_type=%s", response.stop_reason, risk_type
-    )
-
-    text_block = next((b for b in response.content if b.type == "text"), None)
-    if text_block:
-        return _parse_partial_json(text_block.text.strip(), risk_type)
-
-    logger.warning("_synthesize returned no text block for risk_type=%s", risk_type)
-    return {
-        "title": f"Risk detected: {risk_type.replace('_', ' ').title()}",
-        "description": "Action plan temporarily unavailable. Please consult your financial aid office.",
-        "urgency": context.get("severity", "warn"),
-        "actions": [],
-        "citations": bundle.visited_urls,
-    }
-
 
 def _parse_partial_json(raw: str, risk_type: str = "aid_risk") -> dict[str, Any]:
     # First, try standard json.loads

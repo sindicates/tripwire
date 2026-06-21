@@ -352,3 +352,25 @@ No emojis anywhere in the UI — use Lucide React icons for all iconography (`lu
 - `.tw-pill` — suggestion chip, stone hover
 - `.tw-fab` — floating action button, stone→green gradient
 - `.tw-chat-input:focus` — stone-colored focus ring
+
+---
+
+### Knowledge-Grounded Action Packets (2026-06-21)
+
+**What it does:** Makes Claude's training knowledge the primary source for action packets and chat Q&A, so the product generates specific, actionable output even when university pages are login-gated.
+
+**Risk engine** (`backend/app/services/risk_engine.py`):
+- Replaced the two-stage `ResearchAgent → _synthesize` pipeline with a single `_knowledge_action_packet()` call.
+- Fetches top-3 pgvector chunks (if any) and passes them alongside the student snapshot + risk type to Claude, which writes the full ActionPacket using its training knowledge of the school.
+- Removed dead `_synthesize()` function and `ResearchBundle` import.
+
+**Research agent** (`backend/app/services/research_agent.py`):
+- Added `ResearchAgent.knowledge_bundle()` classmethod — single Claude call that fills a `ResearchBundle` from training knowledge (no web access required).
+- Wired as the fallback at the end of `research()` instead of `ResearchBundle.empty()`, so the agentverse path also gets substantive output when web crawling fails.
+
+**RAG service** (`backend/app/services/rag.py`):
+- Added `_knowledge_system()`, `_knowledge_only_answer()`, and `_stream_knowledge_only()` helpers.
+- Replaced the two early "no documents" dead-end returns in `answer()` and `stream_answer()` with calls to these helpers — Claude now answers from training knowledge instead of refusing.
+- Added a `knowledge_supplement` string appended to the system prompt when `len(chunks) < 2`, telling Claude to supplement sparse retrieval with its knowledge of the school.
+
+**No new DB migrations or env vars required.**

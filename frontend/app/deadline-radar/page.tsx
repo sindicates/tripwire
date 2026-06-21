@@ -32,8 +32,22 @@ export interface Deadline {
   actionUrl?: string
   relevantToProfile: boolean
   sourceDoc?: string
-  /** true = came from student's own degree_audit_json */
+  /** true = came from student's own degree_audit_json or risk event action packet */
   isPersonal?: boolean
+  /** true = date is estimated from academic calendar templates, not a real policy date */
+  isEstimated?: boolean
+}
+
+interface SemesterDates {
+  semesterEnd: string
+  nextSemStart: string
+  addDropDeadline: string
+  finalsFAFSA: string
+}
+
+type DeadlineTemplate = Omit<Deadline, "id" | "dueDate"> & {
+  daysFromNow?: number
+  anchorKey?: keyof SemesterDates
 }
 
 type NavId = "dashboard" | "risk-feed" | "advisor" | "actions" | "timeline" | "settings"
@@ -68,6 +82,28 @@ interface RawDeadline {
   description?: string
   action_label?: string
   action_url?: string
+}
+
+interface RiskActionStep {
+  title?: string
+  label?: string
+  url: string | null
+  deadline: string | null
+}
+
+interface RiskEvent {
+  id: string
+  risk_type: string
+  severity: "info" | "warn" | "high" | "urgent"
+  predicted_at: string
+  resolved_at: string | null
+  action_packet_json: {
+    title: string
+    description: string
+    urgency: string
+    actions: RiskActionStep[]
+    citations: string[]
+  } | null
 }
 
 // ── Nav ───────────────────────────────────────────────────────────────────────
@@ -194,7 +230,143 @@ const GENERIC_FALLBACKS: Omit<Deadline, "id">[] = [
   },
 ]
 
+// ── Semester date anchors ─────────────────────────────────────────────────────
+
+function getSemesterDates(): SemesterDates {
+  const now = new Date()
+  const y   = now.getFullYear()
+  const m   = now.getMonth() + 1  // 1-12
+  let semesterEnd: string
+  let nextSemStart: string
+
+  if (m >= 8 && m <= 12) {
+    semesterEnd  = `${y}-12-12`
+    nextSemStart = `${y + 1}-01-15`
+  } else if (m >= 1 && m <= 5) {
+    semesterEnd  = `${y}-05-08`
+    nextSemStart = `${y}-08-20`
+  } else {
+    // Summer (June–July)
+    semesterEnd  = `${y}-07-25`
+    nextSemStart = `${y}-08-20`
+  }
+
+  const nextStart = new Date(nextSemStart)
+  nextStart.setDate(nextStart.getDate() + 14)
+  const addDropDeadline = nextStart.toISOString().slice(0, 10)
+
+  // FAFSA priority: next March 1 (if past March, bump to next year)
+  const fafsaYear  = m >= 4 ? y + 1 : y
+  const finalsFAFSA = `${fafsaYear}-03-01`
+
+  return { semesterEnd, nextSemStart, addDropDeadline, finalsFAFSA }
+}
+
+// ── Risk-contextual deadline templates ────────────────────────────────────────
+
+const RISK_DEADLINE_TEMPLATES: Record<string, DeadlineTemplate[]> = {
+  gpa_drop: [
+    {
+      category: "academic", urgency: "urgent", relevantToProfile: true, isEstimated: true, isPersonal: true,
+      title: "Academic Recovery Advisor Meeting",
+      description: "Schedule a meeting with your academic advisor to build a GPA recovery plan before grades finalize. Most schools allow a grade-replacement repeat — ask whether you need to file a form.",
+      daysFromNow: 7,
+      sourceDoc: "[Estimated] Common academic calendar — verify with your school",
+    },
+    {
+      category: "academic", urgency: "warning", relevantToProfile: true, isEstimated: true, isPersonal: true,
+      title: "Grade Replacement Form Deadline",
+      description: "If your school offers grade replacement (course repeat policy), the form is typically due by the end of the term in which the repeat is taken. File before the semester ends.",
+      anchorKey: "semesterEnd",
+      sourceDoc: "[Estimated] Common academic calendar — verify with your school",
+    },
+  ],
+  satisfactory_academic_progress: [
+    {
+      category: "academic", urgency: "urgent", relevantToProfile: true, isEstimated: true, isPersonal: true,
+      title: "Schedule Academic Plan Meeting",
+      description: "SAP appeals require a signed academic plan from your advisor. Book this meeting immediately — advisor calendars fill fast before appeal deadlines.",
+      daysFromNow: 7,
+      sourceDoc: "[Estimated] Common academic calendar — verify with your school",
+    },
+    {
+      category: "financial-aid", urgency: "urgent", relevantToProfile: true, isEstimated: true, isPersonal: true,
+      title: "SAP Appeal Form Submission",
+      description: "File your Satisfactory Academic Progress appeal with the Financial Aid Office. Include a mitigating circumstances statement and a signed academic plan. Missing this window typically means waiting a full term for reinstatement.",
+      daysFromNow: 21,
+      sourceDoc: "[Estimated] Federal SAP Requirements (34 CFR § 668.34) — verify exact date with your school",
+    },
+  ],
+  credit_deficit: [
+    {
+      category: "registration", urgency: "urgent", relevantToProfile: true, isEstimated: true, isPersonal: true,
+      title: "Add Courses Before Add/Drop Closes",
+      description: "You may be able to add credits before the add/drop deadline to improve your completion pace ratio. Each added credit that you complete counts toward the 67% SAP pace requirement.",
+      anchorKey: "addDropDeadline",
+      sourceDoc: "[Estimated] Common academic calendar — verify with your Registrar",
+    },
+    {
+      category: "financial-aid", urgency: "warning", relevantToProfile: true, isEstimated: true, isPersonal: true,
+      title: "SAP Pace Appeal Deadline",
+      description: "If your cumulative completion rate is below the 67% SAP pace threshold, file a SAP appeal with your Financial Aid Office before the next disbursement cycle.",
+      daysFromNow: 30,
+      sourceDoc: "[Estimated] Federal SAP Requirements — verify exact date with your school",
+    },
+  ],
+  aid_risk: [
+    {
+      category: "financial-aid", urgency: "urgent", relevantToProfile: true, isEstimated: true, isPersonal: true,
+      title: "Financial Aid Appeal Submission",
+      description: "File a combined financial aid appeal addressing both GPA and pace issues. Include documentation of mitigating circumstances (medical, family, employment). Aid offices typically process appeals within 2–3 weeks.",
+      daysFromNow: 14,
+      sourceDoc: "[Estimated] Common financial aid policy — verify deadline with your school",
+    },
+    {
+      category: "financial-aid", urgency: "warning", relevantToProfile: true, isEstimated: true, isPersonal: true,
+      title: "FAFSA Priority Renewal",
+      description: "Renew your FAFSA by your school's priority deadline to preserve eligibility for all federal and institutional aid. Late filers risk losing grant funds that don't roll over.",
+      anchorKey: "finalsFAFSA",
+      sourceDoc: "[Estimated] Federal Student Aid — verify your school's priority date",
+    },
+  ],
+  academic_probation: [
+    {
+      category: "academic", urgency: "urgent", relevantToProfile: true, isEstimated: true, isPersonal: true,
+      title: "Academic Probation Appeal Deadline",
+      description: "Submit your formal probation appeal with a mitigating circumstances letter and a signed academic improvement plan. Missing this date typically results in academic suspension for the following term.",
+      daysFromNow: 14,
+      sourceDoc: "[Estimated] Common academic policy — verify exact date with your school's Registrar",
+    },
+    {
+      category: "academic", urgency: "warning", relevantToProfile: true, isEstimated: true, isPersonal: true,
+      title: "End-of-Probation GPA Checkpoint",
+      description: "You must meet your school's minimum GPA by the end of this semester to exit probation and avoid suspension. Schedule an academic recovery plan meeting with your advisor now.",
+      anchorKey: "semesterEnd",
+      sourceDoc: "[Estimated] Common academic policy — verify with your Registrar",
+    },
+  ],
+  enrollment_drop: [
+    {
+      category: "registration", urgency: "urgent", relevantToProfile: true, isEstimated: true, isPersonal: true,
+      title: "Add Courses to Restore Full-Time Status",
+      description: "Most financial aid programs require full-time enrollment (12+ credits). Add courses before the add/drop deadline to maintain aid eligibility for this semester.",
+      anchorKey: "addDropDeadline",
+      sourceDoc: "[Estimated] Common academic calendar — verify with your school's Registrar",
+    },
+  ],
+}
+
 // ── Helpers: category inference ───────────────────────────────────────────────
+
+const RISK_TO_CAT: Record<string, DeadlineCategory> = {
+  gpa_drop:                        "academic",
+  academic_probation:              "academic",
+  satisfactory_academic_progress:  "financial-aid",
+  credit_deficit:                  "financial-aid",
+  aid_risk:                        "financial-aid",
+  enrollment_drop:                 "registration",
+  deadline_miss:                   "academic",
+}
 
 const KEYWORD_TO_CAT: [string[], DeadlineCategory][] = [
   [["fafsa", "css profile", "financial aid", "scholarship", "aid", "grant", "sap", "appeal"], "financial-aid"],
@@ -221,11 +393,49 @@ function inferUrgency(dueDate: string): UrgencyLevel {
   return "info"
 }
 
+function buildRiskDeadlines(
+  riskEvents: RiskEvent[],
+  semDates: SemesterDates,
+  existingTitles: Set<string>,
+): Omit<Deadline, "id">[] {
+  const out: Omit<Deadline, "id">[] = []
+  const seen = new Set<string>(existingTitles)
+
+  for (const event of riskEvents) {
+    if (event.resolved_at) continue
+    const templates = RISK_DEADLINE_TEMPLATES[event.risk_type]
+    if (!templates) continue
+
+    for (const t of templates) {
+      if (seen.has(t.title)) continue
+      seen.add(t.title)
+
+      let dueDate: string
+      if (t.anchorKey) {
+        dueDate = semDates[t.anchorKey]
+      } else if (t.daysFromNow !== undefined) {
+        const d = new Date()
+        d.setDate(d.getDate() + t.daysFromNow)
+        dueDate = d.toISOString().slice(0, 10)
+      } else {
+        continue
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { daysFromNow: _d, anchorKey: _a, ...rest } = t
+      out.push({ ...rest, dueDate, urgency: inferUrgency(dueDate) })
+    }
+  }
+
+  return out
+}
+
 // ── Build deadline list from backend data + school fallbacks ──────────────────
 
 function buildDeadlines(
   student: BackendStudent | null,
   schoolName: string | null,
+  riskEvents: RiskEvent[],
 ): Deadline[] {
   let id = 1
   const result: Deadline[] = []
@@ -249,14 +459,47 @@ function buildDeadlines(
     }
   }
 
-  // 2. Institutional deadlines for the student's school
-  const key = (schoolName ?? "").toLowerCase().trim()
-  const institutionalList =
-    INSTITUTIONAL_DEADLINES[key] ?? GENERIC_FALLBACKS
+  // 2. RAG-sourced deadlines from risk event action packets
+  for (const event of riskEvents) {
+    if (event.resolved_at) continue
+    const pkt = event.action_packet_json
+    if (!pkt) continue
+    const cat = RISK_TO_CAT[event.risk_type] ?? inferCategory(pkt.title)
+    for (const action of pkt.actions) {
+      const dateStr = action.deadline
+      if (!dateStr || isNaN(new Date(dateStr).getTime())) continue
+      const title = action.title ?? action.label ?? pkt.title
+      result.push({
+        id: id++,
+        category: cat,
+        title,
+        description: pkt.description,
+        dueDate: dateStr,
+        urgency: inferUrgency(dateStr),
+        actionLabel: action.url ? "Take Action" : undefined,
+        actionUrl: action.url ?? undefined,
+        relevantToProfile: true,
+        sourceDoc: pkt.citations?.[0] ?? "Sherpa Risk Analysis",
+        isPersonal: true,
+      })
+    }
+  }
 
-  // Avoid duplicating personal deadlines that fall on the same date + title
+  // 2b. Risk-contextual estimated deadlines (de-duped against real titles above)
+  const semDates = getSemesterDates()
+  const existingTitles = new Set(result.map(d => d.title))
+  for (const est of buildRiskDeadlines(riskEvents, semDates, existingTitles)) {
+    result.push({ ...est, id: id++ })
+  }
+
+  // 3. Institutional fallbacks — only for categories not already covered by live data
+  const liveCategories = new Set(result.map(d => d.category))
+  const key = (schoolName ?? "").toLowerCase().trim()
+  const institutionalList = INSTITUTIONAL_DEADLINES[key] ?? GENERIC_FALLBACKS
+
   const personalKeys = new Set(result.map(d => `${d.title}|${d.dueDate}`))
   for (const inst of institutionalList) {
+    if (liveCategories.has(inst.category)) continue  // skip if RAG already covers this category
     if (!personalKeys.has(`${inst.title}|${inst.dueDate}`)) {
       result.push({ ...inst, id: id++ })
     }
@@ -455,6 +698,7 @@ export default function DeadlineRadarPage() {
   const [profile,         setProfile]        = useState<Profile>({ display_name: null, school: null, year: null })
   const [backendStudent,  setBackendStudent]  = useState<BackendStudent | null>(null)
   const [backendStatus,   setBackendStatus]   = useState<"loading" | "ok" | "offline">("loading")
+  const [riskEvents,      setRiskEvents]      = useState<RiskEvent[]>([])
   const [selectedId,      setSelectedId]      = useState<number | null>(null)
   const [enabledCats,     setEnabledCats]     = useState<Set<DeadlineCategory>>(
     new Set(Object.keys(CAT) as DeadlineCategory[])
@@ -482,6 +726,17 @@ export default function DeadlineRadarPage() {
           const student: BackendStudent = await res.json()
           setBackendStudent(student)
           setBackendStatus("ok")
+
+          // Fetch risk events so RAG-produced deadlines appear on the timeline
+          try {
+            const reRes = await fetch(`${API_BASE}/api/v1/risk-events/?student_id=${student.id}`)
+            if (reRes.ok) {
+              const events: RiskEvent[] = await reRes.json()
+              setRiskEvents(events)
+            }
+          } catch {
+            // non-fatal — timeline falls back to institutional data
+          }
         } else {
           setBackendStatus("ok")  // backend reachable but no student record yet — still show fallbacks
         }
@@ -512,8 +767,8 @@ export default function DeadlineRadarPage() {
   // ── Deadline computation ────────────────────────────────────────────────────
   // Memoised so it only recomputes when the student or Supabase profile changes.
   const allDeadlines = useMemo(
-    () => buildDeadlines(backendStudent, profile.school),
-    [backendStudent, profile.school]
+    () => buildDeadlines(backendStudent, profile.school, riskEvents),
+    [backendStudent, profile.school, riskEvents]
   )
 
   const sorted        = allDeadlines
@@ -540,8 +795,8 @@ export default function DeadlineRadarPage() {
             {backendStatus === "loading" && "Loading your deadlines…"}
             {backendStatus === "offline" && "Showing general institutional deadlines — connect the backend for personalised ones."}
             {backendStatus === "ok" && personalCount > 0
-              ? `${personalCount} deadline${personalCount !== 1 ? "s" : ""} from your academic record · institutional deadlines shown below.`
-              : backendStatus === "ok" && "Showing institutional deadlines. Upload a degree audit to see personalised dates."}
+              ? `${personalCount} deadline${personalCount !== 1 ? "s" : ""} from your risk profile · institutional fallbacks shown below.`
+              : backendStatus === "ok" && "Showing institutional deadlines. Run a risk scan to surface personalised action deadlines."}
           </p>
         </div>
 
@@ -630,7 +885,11 @@ export default function DeadlineRadarPage() {
                       >
                         <div style={{ fontFamily: "'Satoshi', sans-serif", fontSize: 9, fontWeight: 700, color: C.color, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 4, display: "flex", alignItems: "center", gap: 4 }}>
                           {C.label}
-                          {d.isPersonal && <span style={{ background: "rgba(181,176,168,0.2)", borderRadius: 2, padding: "1px 4px", fontSize: 8, color: "#b5b0a8" }}>yours</span>}
+                          {d.isEstimated
+                            ? <span style={{ background: "rgba(120,120,120,0.18)", borderRadius: 2, padding: "1px 4px", fontSize: 8, color: "#888" }}>[est.]</span>
+                            : d.isPersonal
+                              ? <span style={{ background: "rgba(181,176,168,0.2)", borderRadius: 2, padding: "1px 4px", fontSize: 8, color: "#b5b0a8" }}>yours</span>
+                              : null}
                         </div>
                         <div style={{ fontFamily: "'Merriweather', serif", fontWeight: 700, fontSize: 11, color: "#ffffff", lineHeight: 1.35, marginBottom: 6, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
                           {d.title}
@@ -657,11 +916,15 @@ export default function DeadlineRadarPage() {
                     <span style={{ fontFamily: "'Satoshi', sans-serif", fontSize: 11, fontWeight: 700, color: C.color, textTransform: "uppercase", letterSpacing: "0.08em" }}>
                       {C.label}
                     </span>
-                    {selected.isPersonal && (
+                    {selected.isEstimated ? (
+                      <span style={{ fontSize: 10, background: "rgba(120,120,120,0.12)", color: "#888", borderRadius: 4, padding: "2px 8px", border: "1px solid rgba(120,120,120,0.2)" }}>
+                        Estimated — verify with your school
+                      </span>
+                    ) : selected.isPersonal ? (
                       <span style={{ fontSize: 10, background: "rgba(181,176,168,0.15)", color: "#b5b0a8", borderRadius: 4, padding: "2px 8px", border: "1px solid rgba(181,176,168,0.2)" }}>
                         From your academic record
                       </span>
-                    )}
+                    ) : null}
                     <span style={{ color: "#2a5636" }}>·</span>
                     <span style={{ fontFamily: "'Satoshi', sans-serif", fontSize: 11, color: URGENCY_BADGE[selected.urgency].color }}>
                       {URGENCY_BADGE[selected.urgency].label}

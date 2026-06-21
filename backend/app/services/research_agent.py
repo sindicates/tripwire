@@ -50,9 +50,7 @@ _RESEARCH_SYSTEM = (
     "Process:\n"
     "1. Use search_web and fetch_page to find the information listed in the task.\n"
     "2. Only fetch .edu pages or official institution pages.\n"
-    "3. When you have gathered enough facts, output ONLY a valid JSON object matching "
-    "the ResearchBundle schema below. No prose before or after — just the JSON.\n\n"
-    f"ResearchBundle schema:\n{_BUNDLE_SCHEMA}\n\n"
+    "3. When you have gathered enough facts, you MUST call the submit_research_bundle tool.\n\n"
     "Anti-hallucination rules:\n"
     "- 'visited_urls' must contain only URLs you actually called fetch_page on.\n"
     "- 'form_names' must be exact names found on official pages, not guesses.\n"
@@ -137,10 +135,54 @@ RESEARCH_TOOLS: list[dict] = [
             "required": ["url"],
         },
     },
+    {
+        "name": "submit_research_bundle",
+        "description": "Submit the final research facts. Call this ONLY when you have gathered all necessary information.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "appeal_process_text": {"type": ["string", "null"], "description": "Full text excerpt describing the appeal/reinstatement process"},
+                "form_names": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Exact form names found, e.g. 'SAP Appeal Form'"
+                },
+                "key_deadlines": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "name": {"type": "string", "description": "Deadline name"},
+                            "description": {"type": "string", "description": "What it is for"},
+                            "date_text": {"type": "string", "description": "Exact date text from the source, e.g. '2024-08-15' or 'last day of finals week'"}
+                        },
+                        "required": ["name", "description", "date_text"]
+                    }
+                },
+                "contact_info": {
+                    "type": "object",
+                    "properties": {
+                        "office": {"type": ["string", "null"]},
+                        "email": {"type": ["string", "null"]},
+                        "phone": {"type": ["string", "null"]}
+                    }
+                },
+                "policy_excerpts": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Relevant quoted passages from policy pages"
+                },
+                "visited_urls": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "All URLs you actually fetched with fetch_page"
+                }
+            },
+            "required": ["form_names", "key_deadlines", "contact_info", "policy_excerpts", "visited_urls"]
+        }
+    }
 ]
 
-# On this iteration (0-indexed) and beyond, no tools are passed so Claude must
-# write the bundle JSON. Set to second-to-last so Claude has one forced text pass.
 _MAX_ITERATIONS = 6
 _FORCE_FINAL_AT = 4
 
@@ -171,8 +213,8 @@ def _build_research_task(
         f"Student context (for understanding what to look for):\n{snapshot_lines}\n"
         f"{seed_section}\n"
         f"{goals}\n\n"
-        "When you have gathered the information above, output the ResearchBundle JSON. "
-        "Do NOT synthesize or advise — just return what you found."
+        "When you have gathered the information above, call the submit_research_bundle tool. "
+        "Do NOT synthesize or advise — just return what you found via the tool."
     )
 
 
@@ -207,6 +249,60 @@ class ResearchAgent:
     def __init__(self) -> None:
         self._client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
 
+    @classmethod
+    async def knowledge_bundle(
+        cls,
+        risk_type: str,
+        school_name: str,
+        student_snapshot: dict,
+    ) -> ResearchBundle:
+        """Single Claude call using training knowledge when web research fails or is unavailable."""
+        client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+        goals = _RESEARCH_GOALS.get(
+            risk_type,
+            f"Research the {risk_type.replace('_', ' ')} process and required response steps.",
+        )
+        snapshot_lines = "\n".join(
+            f"  {k.replace('_', ' ').title()}: {v}"
+            for k, v in student_snapshot.items()
+            if v is not None
+        )
+
+        user_message = (
+            f"Task: Fill out a research bundle for {risk_type.replace('_', ' ').upper()} "
+            f"at {school_name}.\n\n"
+            f"Student context:\n{snapshot_lines}\n\n"
+            f"Research goals:\n{goals}\n\n"
+            f"Using your training knowledge of {school_name}'s policies, fill in as much of "
+            f"the following bundle as you can. Use null for anything you are not confident about.\n\n"
+            f"Return ONLY valid JSON matching this schema:\n{_BUNDLE_SCHEMA}"
+        )
+
+        try:
+            response = await client.messages.create(
+                model=CLAUDE_MODEL,
+                max_tokens=2048,
+                system=(
+                    "You are a university policy research assistant with expert knowledge of US "
+                    "university financial aid and academic standing policies. Return factual "
+                    "information about the requested school's policies as JSON. Use null for any "
+                    "field you cannot fill confidently. Output ONLY valid JSON — no prose before or after."
+                ),
+                messages=[{"role": "user", "content": user_message}],
+            )
+            text_block = next((b for b in response.content if b.type == "text"), None)
+            if text_block:
+                raw = text_block.text.strip()
+                m = re.search(r"```(?:json)?\s*(.*?)```", raw, re.DOTALL)
+                data = json.loads(m.group(1) if m else raw)
+                return ResearchBundle.from_dict(data)
+        except Exception:
+            logger.warning(
+                "knowledge_bundle failed for risk_type=%s:\n%s",
+                risk_type, traceback.format_exc(),
+            )
+        return ResearchBundle.empty()
+
     async def research(
         self,
         risk_type: str,
@@ -230,9 +326,11 @@ class ResearchAgent:
                     max_tokens=4096,
                     system=_RESEARCH_SYSTEM,
                     messages=messages,
+                    tools=RESEARCH_TOOLS,
                 )
-                if not is_final:
-                    create_kwargs["tools"] = RESEARCH_TOOLS
+
+                if is_final:
+                    create_kwargs["tool_choice"] = {"type": "tool", "name": "submit_research_bundle"}
 
                 response = await self._client.messages.create(**create_kwargs)
                 logger.info(
@@ -242,19 +340,14 @@ class ResearchAgent:
                 )
                 messages.append({"role": "assistant", "content": response.content})
 
-                if response.stop_reason == "end_turn":
-                    text_block = next(
-                        (b for b in response.content if b.type == "text"), None
-                    )
-                    if text_block:
-                        return self._parse_bundle(text_block.text)
-                    logger.warning("ResearchAgent end_turn with no text block at iteration=%d", iteration)
-                    break
-
                 if response.stop_reason == "tool_use":
                     tool_results = []
                     for block in response.content:
                         if block.type == "tool_use":
+                            if block.name == "submit_research_bundle":
+                                logger.info("ResearchAgent submitted bundle.")
+                                return ResearchBundle.from_dict(block.input)
+
                             logger.info(
                                 "ResearchAgent tool_call name=%s input=%s",
                                 block.name, block.input,
@@ -271,6 +364,12 @@ class ResearchAgent:
                                 "content": result_str,
                             })
                     messages.append({"role": "user", "content": tool_results})
+                elif response.stop_reason == "end_turn":
+                    # Model stopped without submitting the bundle. Prompt it to do so.
+                    messages.append({
+                        "role": "user",
+                        "content": "You stopped without calling submit_research_bundle. Please call the tool with your findings."
+                    })
                 else:
                     logger.warning(
                         "ResearchAgent unexpected stop_reason=%s at iteration=%d",
@@ -284,28 +383,10 @@ class ResearchAgent:
                 risk_type, traceback.format_exc(),
             )
 
-        return ResearchBundle.empty()
+        logger.info(
+            "ResearchAgent web research exhausted, falling back to knowledge_bundle for risk_type=%s",
+            risk_type,
+        )
+        return await ResearchAgent.knowledge_bundle(risk_type, school_name, student_snapshot)
 
-    def _parse_bundle(self, raw: str) -> ResearchBundle:
-        text = raw.strip()
-        if text.startswith("```"):
-            parts = text.split("```")
-            text = parts[1] if len(parts) > 1 else text
-            if text.startswith("json"):
-                text = text[4:]
-            text = text.strip()
 
-        try:
-            return ResearchBundle.from_dict(json.loads(text))
-        except json.JSONDecodeError:
-            pass
-
-        outer = re.search(r"\{[\s\S]*\}", text)
-        if outer:
-            try:
-                return ResearchBundle.from_dict(json.loads(outer.group()))
-            except json.JSONDecodeError:
-                pass
-
-        logger.warning("ResearchAgent could not parse bundle JSON; returning empty bundle")
-        return ResearchBundle.empty()

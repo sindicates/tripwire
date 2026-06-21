@@ -286,6 +286,102 @@ class RAGService:
                     school.last_ingested_at = datetime.now(timezone.utc)
                     await session.commit()
 
+    # ── Knowledge-only fallback ───────────────────────────────────────────────
+
+    def _knowledge_system(self, school_name: str) -> str:
+        return (
+            f"You are a knowledgeable academic advisor for {school_name}. "
+            "No indexed policy documents are currently available for this school. "
+            "Answer using your training knowledge of this institution's financial aid policies, "
+            "academic standing requirements, SAP policies, and appeal processes. "
+            "Be specific: name the likely financial aid office, typical form names, and standard procedures. "
+            "Prefix knowledge-based claims with 'Based on standard policy...' when you are not fully certain. "
+            "Write for a stressed undergraduate — no jargon, no hedging. "
+            "If and ONLY IF the answer requires a concrete action (a form, deadline, or office visit), "
+            "append a JSON block at the very end fenced with ```json:\n"
+            "```json\n"
+            '{"title": "Short action title", "description": "One-sentence summary", '
+            '"actions": [{"label": "Step text", "url": null, "deadline": null, "office": "Office name"}]}\n'
+            "```\n"
+            "Omit the block entirely for purely informational answers."
+        )
+
+    async def _knowledge_only_answer(self, query: str, school_name: str) -> dict:
+        """Answer using Claude's training knowledge when no docs are ingested."""
+        try:
+            msg = await self._get_anthropic().messages.create(
+                model="claude-sonnet-4-6",
+                max_tokens=1500,
+                system=self._knowledge_system(school_name),
+                messages=[{"role": "user", "content": query}],
+            )
+            full_text = msg.content[0].text
+            action_packet = None
+            action_match = re.search(r"```json\s*(.*?)```", full_text, re.DOTALL)
+            if action_match:
+                try:
+                    action_packet = json.loads(action_match.group(1))
+                    prose = (
+                        full_text[: action_match.start()].rstrip()
+                        + full_text[action_match.end() :].lstrip()
+                    ).strip()
+                except json.JSONDecodeError:
+                    prose = full_text
+            else:
+                prose = full_text
+            return {"answer": prose, "citations": [], "action_packet": action_packet}
+        except Exception as e:
+            logging.getLogger("uvicorn").error(f"Knowledge-only answer error: {e}")
+            return {
+                "answer": (
+                    "The academic policy database is temporarily offline. Please try again later."
+                ),
+                "citations": [],
+                "action_packet": None,
+            }
+
+    async def _stream_knowledge_only(
+        self, query: str, school_name: str
+    ) -> AsyncGenerator[dict, None]:
+        """Stream a knowledge-only answer when no docs are ingested."""
+        _log = logging.getLogger("uvicorn")
+        try:
+            full_text = ""
+            async with self._get_anthropic().messages.stream(
+                model="claude-sonnet-4-6",
+                max_tokens=1500,
+                system=self._knowledge_system(school_name),
+                messages=[{"role": "user", "content": query}],
+            ) as stream:
+                async for text in stream.text_stream:
+                    full_text += text
+                    yield {"type": "text", "text": text}
+
+            action_packet = None
+            prose = full_text
+            action_match = re.search(r"```json\s*(.*?)```", full_text, re.DOTALL)
+            if action_match:
+                try:
+                    action_packet = json.loads(action_match.group(1))
+                    prose = (
+                        full_text[: action_match.start()].rstrip()
+                        + full_text[action_match.end() :].lstrip()
+                    ).strip()
+                except json.JSONDecodeError:
+                    pass
+            yield {
+                "type": "done",
+                "final_text": prose,
+                "citations": [],
+                "action_packet": action_packet,
+            }
+        except Exception as e:
+            _log.error(f"Knowledge-only stream error: {e}")
+            yield {
+                "type": "error",
+                "message": "The academic policy database is temporarily offline. Please try again later.",
+            }
+
     # ── Retrieval ─────────────────────────────────────────────────────────────
 
     async def search(
@@ -383,33 +479,19 @@ class RAGService:
         risk_id: uuid.UUID | None = None,
     ) -> dict:
         """Return {answer, citations} grounded in retrieved policy chunks."""
-        # 1. Check if there are any chunks for this school in DB first, to avoid
-        # unnecessary OpenAI embedding API calls if no docs are ingested.
+        # 1. Check if docs exist. If not, answer from Claude's training knowledge directly
+        #    (avoids an unnecessary OpenAI embedding call when OPENAI_API_KEY may be blank).
         chunks_exist_result = await session.execute(
             select(DocChunk.id).where(DocChunk.school_id == school_id).limit(1)
         )
         if not chunks_exist_result.scalar():
-            return {
-                "answer": (
-                    "No policy documents have been ingested for this school yet. "
-                    "Ask an admin to submit a policy URL first."
-                ),
-                "citations": [],
-                "action_packet": None,
-            }
+            return await self._knowledge_only_answer(query, school_name)
 
         # 2. Search and generate answer, catching any external API quota/auth errors gracefully.
         try:
             chunks = await self.search(query, school_id, session)
             if not chunks:
-                return {
-                    "answer": (
-                        "No policy documents have been ingested for this school yet. "
-                        "Ask an admin to submit a policy URL first."
-                    ),
-                    "citations": [],
-                    "action_packet": None,
-                }
+                return await self._knowledge_only_answer(query, school_name)
 
             # 3. Dynamic subpage fetch: discover links from the school's financial aid URL,
             #    ask Claude which subpages are most likely to answer this question, fetch them live.
@@ -473,6 +555,15 @@ class RAGService:
                     for i, d in enumerate(dynamic_docs)
                 )
 
+            knowledge_supplement = ""
+            if len(chunks) < 2:
+                knowledge_supplement = (
+                    f"\n\nIMPORTANT: Only {len(chunks)} policy document chunk(s) were found for "
+                    f"{school_name}. Supplement with your training knowledge of this school's "
+                    "specific offices, form names, and standard processes. Flag any knowledge-based "
+                    "claims with 'Based on standard policy...' rather than citing a source URL."
+                )
+
             system = (
                 f"You are a knowledgeable academic advisor for {school_name}. "
                 "Your job is to help students understand their financial aid and academic policies. "
@@ -495,6 +586,7 @@ class RAGService:
                 '"actions": [{"label": "Step text", "url": "URL from the policy excerpts above or null if not found", "deadline": "YYYY-MM-DD or null", "office": "Office name"}]}\n'
                 "```\n"
                 "All action fields except label are optional. For 'url': only use a URL that appears verbatim in the policy excerpts above — never invent or guess a URL. Set to null if no real URL is available. Omit the block entirely for purely informational answers."
+                + knowledge_supplement
             )
 
             msg = await self._get_anthropic().messages.create(
@@ -575,29 +667,15 @@ class RAGService:
             select(DocChunk.id).where(DocChunk.school_id == school_id).limit(1)
         )
         if not chunks_exist_result.scalar():
-            yield {
-                "type": "done",
-                "final_text": (
-                    "No policy documents have been ingested for this school yet. "
-                    "Ask an admin to submit a policy URL first."
-                ),
-                "citations": [],
-                "action_packet": None,
-            }
+            async for event in self._stream_knowledge_only(query, school_name):
+                yield event
             return
 
         try:
             chunks = await self.search(query, school_id, session)
             if not chunks:
-                yield {
-                    "type": "done",
-                    "final_text": (
-                        "No policy documents have been ingested for this school yet. "
-                        "Ask an admin to submit a policy URL first."
-                    ),
-                    "citations": [],
-                    "action_packet": None,
-                }
+                async for event in self._stream_knowledge_only(query, school_name):
+                    yield event
                 return
 
             # Dynamic subpage fetch (best-effort)
@@ -656,6 +734,15 @@ class RAGService:
                     for i, d in enumerate(dynamic_docs)
                 )
 
+            knowledge_supplement = ""
+            if len(chunks) < 2:
+                knowledge_supplement = (
+                    f"\n\nIMPORTANT: Only {len(chunks)} policy document chunk(s) were found for "
+                    f"{school_name}. Supplement with your training knowledge of this school's "
+                    "specific offices, form names, and standard processes. Flag any knowledge-based "
+                    "claims with 'Based on standard policy...' rather than citing a source URL."
+                )
+
             system = (
                 f"You are a knowledgeable academic advisor for {school_name}. "
                 "Your job is to help students understand their financial aid and academic policies. "
@@ -678,6 +765,7 @@ class RAGService:
                 '"actions": [{"label": "Step text", "url": "URL from the policy excerpts above or null if not found", "deadline": "YYYY-MM-DD or null", "office": "Office name"}]}\n'
                 "```\n"
                 "All action fields except label are optional. For 'url': only use a URL that appears verbatim in the policy excerpts above — never invent or guess a URL. Set to null if no real URL is available. Omit the block entirely for purely informational answers."
+                + knowledge_supplement
             )
 
             full_text = ""

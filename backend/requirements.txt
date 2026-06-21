@@ -20,9 +20,6 @@ redis>=5.2.0
 anthropic>=0.40.0
 openai>=1.57.0
 
-# Fetch.ai uAgent (Research Agent)
-uagents>=0.17.0
-
 # Document ingestion
 beautifulsoup4>=4.12.3
 httpx>=0.27.0

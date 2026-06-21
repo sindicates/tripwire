@@ -3,6 +3,8 @@
 import { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
+import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
 import {
   LayoutDashboard,
   AlertTriangle,
@@ -323,9 +325,52 @@ export default function ChatPage() {
         @keyframes spin    { from { transform: rotate(0deg)   } to { transform: rotate(360deg) } }
         @keyframes fadeIn  { from { opacity: 0; transform: translateY(8px) } to { opacity: 1; transform: translateY(0) } }
         @keyframes pulse   { 0%, 100% { opacity: 1 } 50% { opacity: 0.4 } }
+        .chat-md > *:first-child { margin-top: 0 !important; }
+        .chat-md > *:last-child  { margin-bottom: 0 !important; }
+        .chat-md ul li::marker, .chat-md ol li::marker { color: #9aafa0; }
       `}</style>
     </div>
   )
+}
+
+// ── Markdown components ───────────────────────────────────────────────────────
+
+const mdComponents: React.ComponentProps<typeof ReactMarkdown>["components"] = {
+  h1: ({ children }) => <h1 style={{ fontFamily: "'Merriweather', serif", fontWeight: 700, fontSize: 16, margin: "14px 0 6px", color: "#ffffff", letterSpacing: "-0.2px" }}>{children}</h1>,
+  h2: ({ children }) => <h2 style={{ fontFamily: "'Merriweather', serif", fontWeight: 700, fontSize: 15, margin: "12px 0 5px", color: "#ffffff", letterSpacing: "-0.2px" }}>{children}</h2>,
+  h3: ({ children }) => <h3 style={{ fontFamily: "'Satoshi', sans-serif", fontWeight: 700, fontSize: 14, margin: "10px 0 4px", color: "#ccc9c2" }}>{children}</h3>,
+  p:  ({ children }) => <p style={{ margin: "0 0 8px", fontSize: 14, lineHeight: 1.65, color: "inherit" }}>{children}</p>,
+  ul: ({ children }) => <ul style={{ margin: "4px 0 8px", paddingLeft: 18, fontSize: 14, lineHeight: 1.65, display: "flex", flexDirection: "column", gap: 3 }}>{children}</ul>,
+  ol: ({ children }) => <ol style={{ margin: "4px 0 8px", paddingLeft: 18, fontSize: 14, lineHeight: 1.65, display: "flex", flexDirection: "column", gap: 3 }}>{children}</ol>,
+  li: ({ children }) => <li style={{ color: "inherit" }}>{children}</li>,
+  strong: ({ children }) => <strong style={{ fontWeight: 700, color: "#ffffff" }}>{children}</strong>,
+  em: ({ children }) => <em style={{ fontStyle: "italic", color: "#ccc9c2" }}>{children}</em>,
+  hr: () => <hr style={{ border: "none", borderTop: "1px solid #2a5636", margin: "10px 0" }} />,
+  blockquote: ({ children }) => (
+    <blockquote style={{ borderLeft: "3px solid #b5b0a8", margin: "8px 0", padding: "4px 12px", background: "rgba(181,176,168,0.06)", borderRadius: "0 4px 4px 0", color: "#ccc9c2", fontSize: 13 }}>
+      {children}
+    </blockquote>
+  ),
+  code: ({ children, className }) => {
+    const isBlock = className?.includes("language-")
+    return isBlock
+      ? <code style={{ display: "block", background: "rgba(0,0,0,0.3)", borderRadius: 6, padding: "8px 12px", fontSize: 12, fontFamily: "monospace", color: "#9aafa0", overflowX: "auto", margin: "6px 0" }}>{children}</code>
+      : <code style={{ background: "rgba(181,176,168,0.1)", borderRadius: 3, padding: "1px 5px", fontSize: 12, fontFamily: "monospace", color: "#ccc9c2" }}>{children}</code>
+  },
+  table: ({ children }) => (
+    <div style={{ overflowX: "auto", margin: "8px 0" }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>{children}</table>
+    </div>
+  ),
+  thead: ({ children }) => <thead style={{ borderBottom: "1px solid #2a5636" }}>{children}</thead>,
+  th: ({ children }) => <th style={{ padding: "6px 10px", textAlign: "left", fontWeight: 700, color: "#9aafa0", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em" }}>{children}</th>,
+  td: ({ children }) => <td style={{ padding: "6px 10px", borderBottom: "1px solid rgba(42,86,54,0.5)", color: "#ffffff", verticalAlign: "top" }}>{children}</td>,
+  a: ({ href, children }) => (
+    <a href={href} target="_blank" rel="noopener noreferrer"
+      style={{ color: "#b5b0a8", textDecoration: "underline", textUnderlineOffset: 2 }}>
+      {children}
+    </a>
+  ),
 }
 
 // ── Empty state ───────────────────────────────────────────────────────────────
@@ -388,8 +433,10 @@ function MessageBubble({ message }: { message: Message }) {
           <ThinkingIndicator />
         ) : (
           <div style={{ background: message.error ? "rgba(251,146,60,0.08)" : "rgba(18,38,24,0.85)", border: `1px solid ${message.error ? "rgba(251,146,60,0.25)" : "#2a5636"}`, borderRadius: "18px 18px 18px 4px", padding: "14px 18px", maxWidth: "85%" }}>
-            <div style={{ fontSize: 14, lineHeight: 1.75, color: message.error ? "#fb923c" : "#ffffff", whiteSpace: "pre-wrap", fontFamily: "'Satoshi', sans-serif" }}>
-              {message.content}
+            <div className="chat-md" style={{ color: message.error ? "#fb923c" : "#ffffff" }}>
+              <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
+                {message.content}
+              </ReactMarkdown>
             </div>
             {message.citations && message.citations.length > 0 && (
               <CitationList citations={message.citations} />
