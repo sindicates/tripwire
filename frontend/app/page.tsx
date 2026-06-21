@@ -58,10 +58,10 @@ export default function LandingPage() {
         </Link>
 
         <div style={{ display: 'flex', gap: '28px' }}>
-          {(['How it works', 'Risk types', 'About'] as const).map((link) => (
+          {([['Why Sherpa', '#why-sherpa'], ['How It Works', '#how-it-works']] as const).map(([label, href]) => (
             <a
-              key={link}
-              href="#"
+              key={label}
+              href={href}
               style={{
                 fontFamily: 'Satoshi, sans-serif',
                 fontWeight: 400,
@@ -72,7 +72,7 @@ export default function LandingPage() {
               }}
               onMouseEnter={(e) => (e.currentTarget.style.color = '#fff')}
               onMouseLeave={(e) => (e.currentTarget.style.color = 'rgba(255,255,255,0.6)')}
-            >{link}</a>
+            >{label}</a>
           ))}
         </div>
 
@@ -301,7 +301,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── WHY TRIPWIRE ── */}
-      <section style={{ background: '#f9fafb', padding: '52px 36px', position: 'relative', zIndex: 1, marginTop: '-60px' }}>
+      <section id="why-sherpa" style={{ background: '#f9fafb', padding: '52px 36px', position: 'relative', zIndex: 1, marginTop: '-60px' }}>
         <div style={{ maxWidth: '840px', margin: '0 auto' }}>
 
           <p className="reveal" style={{
@@ -553,7 +553,7 @@ export default function LandingPage() {
       {/* ── CTA ── */}
       <section style={{
         background: '#1e3824',
-        padding: '52px 36px',
+        padding: '22px 36px 16px',
         textAlign: 'center',
       }}>
         <h2 className="reveal" style={{
