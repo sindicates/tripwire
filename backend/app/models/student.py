@@ -14,6 +14,7 @@ class Student(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     email: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    display_name: Mapped[str | None] = mapped_column(String, nullable=True)
     password_hash: Mapped[str | None] = mapped_column(Text, nullable=True)
     school_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("schools.id"), nullable=False)
     major: Mapped[str | None] = mapped_column(String, nullable=True)

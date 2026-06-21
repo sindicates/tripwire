@@ -18,6 +18,7 @@ router = APIRouter(prefix="/students", tags=["students"])
 
 
 class StudentUpdate(BaseModel):
+    display_name: str | None = None
     gpa: float | None = None
     credits_completed: int | None = None
     credits_required: int | None = None
@@ -29,6 +30,7 @@ class StudentUpdate(BaseModel):
 class StudentOut(BaseModel):
     id: uuid.UUID
     email: str
+    display_name: str | None
     school_id: uuid.UUID
     major: str | None
     enrollment_year: int | None
