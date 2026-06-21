@@ -1,337 +1,412 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { createClient } from "@/lib/supabase/client"
+import {
+  LayoutDashboard,
+  AlertTriangle,
+  MessageSquare,
+  ListChecks,
+  TrendingUp,
+  Settings,
+  Compass,
+} from "lucide-react"
+import type { LucideProps } from "lucide-react"
 
-// ── Types (shaped from GET /api/v1/risk-events) ──────────────────────────────
+// ── Types ────────────────────────────────────────────────────────────────────
 
-type Severity = "info" | "warn" | "high" | "urgent"
+type NavId = "dashboard" | "risk-feed" | "advisor" | "actions" | "progress" | "settings"
+type IconComponent = React.ComponentType<LucideProps>
 
-interface ActionPacket {
+interface NavItem { id: NavId; Icon: IconComponent; label: string }
+
+interface Profile {
+  display_name: string | null
+  school: string | null
+  year: string | null
+}
+
+interface RiskCard {
+  id: number
+  severity: "URGENT" | "WARNING" | "INFO"
+  borderColor: string
+  badgeColor: string
+  badgeText: string
   title: string
   description: string
-  urgency: string
-  actions: { label: string; url: string | null; deadline: string | null }[]
-  citations: string[]
 }
 
-interface RiskEvent {
-  id: string
-  student_id: string
-  risk_type: string
-  severity: Severity
-  predicted_at: string
-  resolved_at: string | null
-  context_json: Record<string, unknown> | null
-  action_packet_json: ActionPacket | null
+interface ActionItem {
+  id: number
+  title: string
+  meta: string
+  tag: string
+  tagColor: string
 }
 
-// ── Risk score ───────────────────────────────────────────────────────────────
+// ── Sherpa logo SVG ──────────────────────────────────────────────────────────
 
-const SEVERITY_BASE: Record<Severity, number> = {
-  info: 15,
-  warn: 40,
-  high: 65,
-  urgent: 85,
-}
-
-function computeRiskScore(events: RiskEvent[]): { score: number; label: string } {
-  const active = events.filter(ev => ev.resolved_at == null)
-  if (active.length === 0) {
-    return { score: 0, label: "No active risks" }
-  }
-  const worst = active.reduce((a, b) =>
-    (SEVERITY_BASE[b.severity] ?? SEVERITY_BASE.warn) > (SEVERITY_BASE[a.severity] ?? SEVERITY_BASE.warn) ? b : a
-  )
-  const maxBase = SEVERITY_BASE[worst.severity] ?? SEVERITY_BASE.warn
-  const extraCount = active.length - 1
-  const score = Math.min(100, maxBase + extraCount * 5)
-  const riskName = worst.risk_type.replace(/_/g, " ")
-  const label = extraCount > 0
-    ? `Driven by ${riskName} (${worst.severity}) + ${extraCount} other active risk${extraCount > 1 ? "s" : ""}`
-    : `Driven by ${riskName} (${worst.severity})`
-  return { score, label }
-}
-
-// ── Config ────────────────────────────────────────────────────────────────────
-
-const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
-
-// Stub description written by build_action_packet when Claude is unreachable.
-const STUB_DESC = "Action plan unavailable — AI service unreachable."
-
-// ── Severity styling (real enum values only) ──────────────────────────────────
-
-const CARD_RING: Record<Severity, string> = {
-  info:   "border-blue-200   bg-blue-50",
-  warn:   "border-amber-200  bg-amber-50",
-  high:   "border-orange-200 bg-orange-50",
-  urgent: "border-red-200    bg-red-50",
-}
-
-const BADGE: Record<Severity, string> = {
-  info:   "bg-blue-100   text-blue-800",
-  warn:   "bg-amber-100  text-amber-800",
-  high:   "bg-orange-100 text-orange-800",
-  urgent: "bg-red-100    text-red-800",
-}
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function isUrl(s: unknown): s is string {
-  return typeof s === "string" && (s.startsWith("http://") || s.startsWith("https://"))
-}
-
-function fmt(iso: string) {
-  return new Date(iso).toLocaleString(undefined, {
-    month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
-  })
-}
-
-// ── RiskScoreGauge ────────────────────────────────────────────────────────────
-
-function RiskScoreGauge({ score, label }: { score: number; label: string }) {
-  const clamped = Math.max(0, Math.min(100, score))
-  const color =
-    clamped >= 85 ? "#dc2626" :
-    clamped >= 65 ? "#ea580c" :
-    clamped >= 40 ? "#d97706" :
-    "#2563eb"
+function SherpaLogo({ size = 26 }: { size?: number }) {
   return (
-    <div className="flex flex-col items-center gap-1 w-32 shrink-0">
-      <svg viewBox="0 0 120 70" className="w-28">
-        <path d="M10,60 A50,50 0 0 1 110,60" fill="none" stroke="#e5e7eb" strokeWidth="10" strokeLinecap="round" pathLength="100" />
-        <path d="M10,60 A50,50 0 0 1 110,60" fill="none" stroke={color} strokeWidth="10" strokeLinecap="round" pathLength="100" strokeDasharray="100" strokeDashoffset={100 - clamped} />
-        <text x="60" y="50" textAnchor="middle" className="text-2xl font-bold" fill="#111827">{clamped}</text>
-      </svg>
-      <p className="text-[11px] text-gray-500 text-center leading-tight">{label}</p>
-    </div>
+    <svg width={size} height={size} viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Sherpa">
+      <path d="M14 3L26 23H2L14 3Z" stroke="#b5b0a8" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+      <path d="M14 3L10.5 11L14 9L17.5 11L14 3Z" fill="#b5b0a8" />
+    </svg>
   )
 }
 
-// ── RiskCard ──────────────────────────────────────────────────────────────────
+// ── Static data ──────────────────────────────────────────────────────────────
 
-function RiskCard({ ev }: { ev: RiskEvent }) {
-  const sev = (ev.severity ?? "warn") as Severity
-  const packet = ev.action_packet_json
-  const ctx = ev.context_json ?? {}
-  const isStub = !packet || packet.description === STUB_DESC
-  const source = ctx.source
+const NAV_ITEMS: NavItem[] = [
+  { id: "dashboard", Icon: LayoutDashboard, label: "Dashboard" },
+  { id: "risk-feed", Icon: AlertTriangle, label: "Risk Feed" },
+  { id: "advisor", Icon: MessageSquare, label: "Ask Advisor" },
+  { id: "actions", Icon: ListChecks, label: "Action Center" },
+  { id: "progress", Icon: TrendingUp, label: "My Progress" },
+  { id: "settings", Icon: Settings, label: "Settings" },
+]
+
+const RISK_CARDS: RiskCard[] = [
+  {
+    id: 1, severity: "URGENT", borderColor: "#b5b0a8", badgeColor: "#b5b0a8", badgeText: "URGENT",
+    title: "FAFSA Renewal Window Opens in 14 Days",
+    description: "Your FAFSA renewal deadline is approaching fast. Missing this window may pause your financial aid disbursement for the spring semester and require a manual reinstatement process.",
+  },
+  {
+    id: 2, severity: "WARNING", borderColor: "#facc15", badgeColor: "#facc15", badgeText: "WARNING",
+    title: "Credit Pace Risk: On track to graduate June 2029, not Dec 2028",
+    description: "At your current credit load of 12 credits/semester, you will miss your target graduation date by one full semester. Adding one more course next term keeps you on schedule.",
+  },
+  {
+    id: 3, severity: "INFO", borderColor: "#4ade80", badgeColor: "#4ade80", badgeText: "INFO",
+    title: "Registration opens in 21 days — 2 of your target courses are filling fast",
+    description: "MATH 285 is at 82% capacity and CS 446 is at 67%. Both are required for your degree plan. Plan to register on day one to secure your seat.",
+  },
+]
+
+const ACTION_ITEMS: ActionItem[] = [
+  { id: 1, title: "Submit FAFSA renewal", meta: "Due Jan 1, 2027 · Financial Aid Office", tag: "URGENT", tagColor: "#b5b0a8" },
+  { id: 2, title: "Meet with advisor to adjust credit load", meta: "Schedule before Nov 15", tag: "IMPORTANT", tagColor: "#facc15" },
+  { id: 3, title: "Register for MATH 285 before section fills", meta: "18% seats remaining", tag: "TIME-SENSITIVE", tagColor: "#ccc9c2" },
+]
+
+const SUGGESTED_QUESTIONS = [
+  "Can I drop a class without losing aid?",
+  "What is SAP?",
+  "When does registration open?",
+]
+
+// ── Root component ───────────────────────────────────────────────────────────
+
+export default function SherpaDashboard() {
+  const [activeNav, setActiveNav] = useState<NavId>("dashboard")
+  const [advisorOpen, setAdvisorOpen] = useState(false)
+  const [profile, setProfile] = useState<Profile>({ display_name: null, school: null, year: null })
+  const router = useRouter()
+
+  useEffect(() => {
+    async function loadProfile() {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data } = await supabase
+        .from("students")
+        .select("display_name, school, year")
+        .eq("user_id", user.id)
+        .single()
+      if (data) setProfile(data)
+    }
+    loadProfile()
+  }, [])
+
+  async function signOut() {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.push("/login")
+    router.refresh()
+  }
 
   const handleNavClick = (id: NavId) => {
     setActiveNav(id)
     if (id === "advisor") router.push("/chat")
     else if (id === "actions") router.push("/actions")
     else if (id === "settings") router.push("/settings")
+    else if (id === "risk-feed") router.push("/deadline-radar")
   }
 
   return (
-    <div className={`rounded-xl border p-5 space-y-3 ${CARD_RING[sev] ?? CARD_RING.warn}`}>
+    <div style={{ display: "flex", minHeight: "100vh", background: "linear-gradient(180deg, #2e5a3c 0%, #c8d4d0 60%)", backgroundAttachment: "fixed", color: "#ffffff", fontFamily: "'Satoshi', sans-serif" }}>
+      <Sidebar activeNav={activeNav} onNavClick={handleNavClick} onSignOut={signOut} profile={profile} />
+      <main className="tw-main-content" style={{ flex: 1, overflowY: "auto", padding: "36px 44px", minWidth: 0 }}>
+        <DashboardHeader onSignOut={signOut} profile={profile} />
+        <StatCards />
+        <RiskFeed />
+        <ActionCenter />
+      </main>
 
-      {/* Header row */}
-      <div className="flex items-start justify-between gap-3">
-        <div className="space-y-0.5">
-          <p className="text-xs text-gray-500">{fmt(ev.predicted_at)}</p>
-          <h3 className="font-semibold text-base capitalize">
-            {ev.risk_type.replace(/_/g, " ")}
-          </h3>
-        </div>
-        <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide ${BADGE[sev] ?? BADGE.warn}`}>
-          {sev}
-        </span>
-      </div>
+      <button
+        className="tw-fab"
+        aria-label="Open Trail Guide"
+        onClick={() => setAdvisorOpen(true)}
+        style={{ position: "fixed", bottom: 32, right: 32, width: 52, height: 52, borderRadius: "50%", background: "linear-gradient(to top, #4a8e50, #8a9490)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 24px rgba(181, 176, 168, 0.3)", zIndex: 40 }}
+      >
+        <MessageSquare size={20} color="#111e14" strokeWidth={2} />
+      </button>
 
-      {/* Body: real action packet OR raw context fallback */}
-      {isStub ? (
-        <div className="text-sm space-y-1.5">
-          <p className="font-medium text-gray-600 text-xs uppercase tracking-wide">Context</p>
-          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs">
-            {Object.entries(ctx)
-              .filter(([k]) => k !== "source")
-              .map(([k, v]) => (
-                <div key={k} className="contents">
-                  <dt className="font-medium capitalize text-gray-600">{k.replace(/_/g, " ")}</dt>
-                  <dd className="text-gray-800">{String(v)}</dd>
-                </div>
-              ))}
-          </dl>
-        </div>
-      ) : (
-        <div className="text-sm space-y-1.5">
-          <p className="font-semibold text-gray-800">{packet.title}</p>
-          <p className="text-gray-700 leading-relaxed">{packet.description}</p>
-          {packet.actions.length > 0 && (
-            <ul className="mt-2 space-y-1">
-              {packet.actions.map((a, i) => (
-                <li key={i} className="flex items-center gap-2 text-xs">
-                  {a.url ? (
-                    <a href={a.url} target="_blank" rel="noopener noreferrer"
-                      className="underline text-blue-700 hover:text-blue-900">
-                      {a.label}
-                    </a>
-                  ) : (
-                    <span>{a.label}</span>
-                  )}
-                  {a.deadline && <span className="text-gray-500">· due {a.deadline}</span>}
-                </li>
-              ))}
-            </ul>
-          )}
-          {packet.citations.length > 0 && (
-            <p className="text-xs text-gray-500">
-              {packet.citations.map((c, i) => (
-                <a key={i} href={c} target="_blank" rel="noopener noreferrer"
-                  className="underline mr-2">{c}</a>
-              ))}
-            </p>
-          )}
-        </div>
+      {advisorOpen && (
+        <div onClick={() => setAdvisorOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 49, backdropFilter: "blur(2px)" }} />
       )}
-
-      {/* Source citation */}
-      {source != null && (
-        <div className="pt-2 border-t border-black/10 text-xs text-gray-500">
-          <span className="font-medium">Source: </span>
-          {isUrl(source) ? (
-            <a href={source} target="_blank" rel="noopener noreferrer"
-              className="underline break-all hover:text-gray-700">
-              {source}
-            </a>
-          ) : (
-            <span>{String(source)}</span>
-          )}
-        </div>
-      )}
+      <AdvisorPanel open={advisorOpen} onClose={() => setAdvisorOpen(false)} />
     </div>
   )
 }
 
-// ── Dashboard page ────────────────────────────────────────────────────────────
+// ── Sidebar ──────────────────────────────────────────────────────────────────
 
-export default function DashboardPage() {
-  const [events, setEvents]   = useState<RiskEvent[]>([])
-  const [status, setStatus]   = useState<"loading" | "ok" | "error">("loading")
-  const [studentId, setStudentId] = useState("")
-  const [scanning, setScanning]   = useState(false)
-  const [scanMsg, setScanMsg]     = useState<string | null>(null)
-
-  const fetchEvents = useCallback(async () => {
-    setStatus("loading")
-    try {
-      const res = await fetch(`${API}/api/v1/risk-events`)
-      if (!res.ok) throw new Error(String(res.status))
-      setEvents(await res.json())
-      setStatus("ok")
-    } catch {
-      setStatus("error")
-    }
-  }, [])
-
-  useEffect(() => { fetchEvents() }, [fetchEvents])
-
-  async function handleScan(e: React.FormEvent) {
-    e.preventDefault()
-    const id = studentId.trim()
-    if (!id) return
-    setScanning(true)
-    setScanMsg(null)
-    try {
-      const res = await fetch(`${API}/api/v1/risk-events/scan/${id}`, { method: "POST" })
-      if (res.status === 404) { setScanMsg("Student not found."); return }
-      if (!res.ok) throw new Error(String(res.status))
-      const fired: RiskEvent[] = await res.json()
-      setScanMsg(fired.length ? `${fired.length} new event(s) fired.` : "No new events (cooldown may apply).")
-      await fetchEvents()
-    } catch {
-      setScanMsg("Scan failed — backend unreachable.")
-    } finally {
-      setScanning(false)
-    }
-  }
-
-  const byStudent = events.reduce<Record<string, RiskEvent[]>>((acc, ev) => {
-    ;(acc[ev.student_id] ??= []).push(ev)
-    return acc
-  }, {})
+function Sidebar({ activeNav, onNavClick, onSignOut, profile }: { activeNav: NavId; onNavClick: (id: NavId) => void; onSignOut: () => void; profile: Profile }) {
+  const name = profile.display_name || "Retuz A."
+  const initials = name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()
+  const subtitle = [profile.school, profile.year].filter(Boolean).join(" · ") || "UNR · Junior"
 
   return (
-    <main className="min-h-screen bg-gray-50 p-8">
-      <div className="mx-auto max-w-4xl space-y-8">
-
-        {/* ── Header ── */}
-        <h1 className="text-3xl font-bold text-gray-900">Risk Dashboard</h1>
-
-        {/* ── Scan panel ── */}
-        <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm space-y-4">
-          <div>
-            <h2 className="font-semibold text-lg text-gray-900">Trigger a risk scan</h2>
-            <p className="text-sm text-gray-500 mt-0.5">
-              Paste a student UUID to run rules and persist new events.
-            </p>
-          </div>
-          <form onSubmit={handleScan} className="flex gap-3">
-            <input
-              type="text"
-              value={studentId}
-              onChange={e => setStudentId(e.target.value)}
-              placeholder="e.g. 19eed41d-9f1d-4824-9a4d-298c6eeac7e0 (Berkeley demo)"
-              className="flex-1 rounded-lg border border-gray-300 px-3.5 py-2 text-sm
-                         focus:outline-none focus:ring-2 focus:ring-green-600 focus:border-transparent"
-            />
-            <button
-              type="submit"
-              disabled={scanning || !studentId.trim()}
-              className="rounded-lg bg-green-700 text-white px-5 py-2 text-sm font-semibold
-                         hover:bg-green-800 disabled:opacity-50 disabled:cursor-not-allowed transition"
-            >
-              {scanning ? "Scanning…" : "Scan"}
-            </button>
-          </form>
-          {scanMsg && (
-            <p className="text-sm text-gray-600">{scanMsg}</p>
-          )}
-        </section>
-
-        {/* ── Risk events ── */}
-        <section className="space-y-5">
-          <div className="flex items-center gap-2">
-            <h2 className="font-semibold text-lg text-gray-900">Risk Events</h2>
-            {status === "ok" && (
-              <span className="text-sm text-gray-400">({events.length})</span>
-            )}
-          </div>
-
-          {status === "loading" && (
-            <p className="text-sm text-gray-400 animate-pulse">Loading…</p>
-          )}
-
-          {status === "error" && (
-            <div className="rounded-xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">
-              Backend unreachable — make sure the FastAPI server is running on{" "}
-              <code className="font-mono">{API}</code>.
-            </div>
-          )}
-
-          {status === "ok" && events.length === 0 && (
-            <div className="rounded-xl border border-dashed border-gray-300 bg-white p-10 text-center text-sm text-gray-400">
-              No risk events yet — paste a student UUID above and click <strong>Scan</strong>.
-            </div>
-          )}
-
-          {status === "ok" && events.length > 0 && (
-            <div className="space-y-8">
-              {Object.entries(byStudent).map(([sid, evs]) => (
-                <div key={sid} className="space-y-3">
-                  <div className="flex items-center gap-4">
-                    <RiskScoreGauge score={computeRiskScore(evs).score} label={computeRiskScore(evs).label} />
-                    <p className="text-xs font-mono text-gray-400">student {sid}</p>
-                  </div>
-                  {evs.map(ev => <RiskCard key={ev.id} ev={ev} />)}
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
+    <aside className="tw-sidebar" style={{ width: 220, minWidth: 220, background: "#1e3824", borderRight: "1px solid #2a5636", display: "flex", flexDirection: "column", position: "sticky", top: 0, height: "100vh", overflowY: "auto", flexShrink: 0 }}>
+      <div className="tw-sidebar-logo" style={{ display: "flex", alignItems: "center", gap: 10, padding: "28px 20px 32px" }}>
+        <SherpaLogo size={26} />
+        <span className="nav-brand tw-sidebar-logo-text">Sherpa</span>
       </div>
-    </main>
+
+      <nav style={{ flex: 1, padding: "0 10px", display: "flex", flexDirection: "column", gap: 2 }}>
+        {NAV_ITEMS.map(({ id, Icon, label }) => (
+          <button key={id} className={`tw-nav-link${activeNav === id ? " active" : ""}`} onClick={() => onNavClick(id)}>
+            <Icon size={15} strokeWidth={1.75} style={{ flexShrink: 0 }} />
+            <span className="tw-sidebar-label">{label}</span>
+          </button>
+        ))}
+      </nav>
+
+      <div className="tw-sidebar-user" style={{ padding: "16px 20px", borderTop: "1px solid #2a5636", display: "flex", flexDirection: "column", gap: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ width: 34, height: 34, borderRadius: "50%", background: "linear-gradient(135deg, #b5b0a8, #2d6030)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Satoshi', sans-serif", fontWeight: 700, fontSize: 12, color: "#111e14", flexShrink: 0, letterSpacing: "0.03em" }}>{initials}</div>
+          <div className="tw-sidebar-user-text" style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "#ffffff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</div>
+            <div style={{ fontSize: 11, color: "#9aafa0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{subtitle}</div>
+          </div>
+        </div>
+        <button className="tw-btn-ghost tw-sidebar-label" onClick={onSignOut} style={{ fontSize: 12, textAlign: "left", padding: "4px 0", color: "#9aafa0" }}>Sign out →</button>
+      </div>
+    </aside>
+  )
+}
+
+// ── Dashboard header ──────────────────────────────────────────────────────────
+
+function DashboardHeader({ onSignOut, profile }: { onSignOut: () => void; profile: Profile }) {
+  const hour = new Date().getHours()
+  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening"
+  const firstName = profile.display_name?.split(" ")[0] ?? "Retuz"
+
+  return (
+    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 32, gap: 16 }}>
+      <div>
+        <h1 style={{ fontFamily: "'Merriweather', serif", fontWeight: 700, fontSize: 28, margin: 0, letterSpacing: "-0.3px", lineHeight: 1.2 }}>{greeting}, {firstName}</h1>
+        <p style={{ color: "#9aafa0", margin: "8px 0 0", fontSize: 14, display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", background: "#b5b0a8", boxShadow: "0 0 5px #b5b0a8" }} />
+          3 risks need your attention
+        </p>
+      </div>
+      <button
+        onClick={onSignOut}
+        style={{ background: "none", border: "1px solid #2a5636", borderRadius: 8, padding: "8px 14px", color: "#9aafa0", fontSize: 13, cursor: "pointer", transition: "border-color 0.15s ease, color 0.15s ease", whiteSpace: "nowrap", flexShrink: 0 }}
+        onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#b5b0a8"; e.currentTarget.style.color = "#b5b0a8" }}
+        onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#2a5636"; e.currentTarget.style.color = "#9aafa0" }}
+      >Sign out</button>
+    </div>
+  )
+}
+
+// ── Stat cards ────────────────────────────────────────────────────────────────
+
+function StatCards() {
+  return (
+    <div className="tw-stat-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 36 }}>
+      {/* GPA */}
+      <div className="tw-card" style={{ padding: 24, borderRadius: 8 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div>
+            <div style={{ fontSize: 11, color: "#9aafa0", textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 600, marginBottom: 6 }}>Current GPA</div>
+            <div style={{ fontFamily: "'Merriweather', serif", fontWeight: 700, fontSize: 40, color: "#4ade80", lineHeight: 1 }}>3.82</div>
+          </div>
+          <span style={{ background: "rgba(74, 222, 128, 0.12)", color: "#4ade80", fontSize: 10, fontWeight: 700, padding: "4px 10px", borderRadius: 20, border: "1px solid rgba(74, 222, 128, 0.25)", letterSpacing: "0.05em" }}>SAFE</span>
+        </div>
+        <div style={{ marginTop: 18 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#9aafa0", marginBottom: 6 }}>
+            <span>Aid floor: 2.5</span><span style={{ color: "#4ade80" }}>+1.32 above</span>
+          </div>
+          <div style={{ background: "#2a5636", borderRadius: 4, height: 5, overflow: "hidden" }}>
+            <div style={{ background: "linear-gradient(90deg, #4ade80, #86efac)", width: "74%", height: "100%", borderRadius: 4 }} />
+          </div>
+        </div>
+      </div>
+
+      {/* Credits */}
+      <div className="tw-card" style={{ padding: 24, borderRadius: 8 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div>
+            <div style={{ fontSize: 11, color: "#9aafa0", textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 600, marginBottom: 6 }}>Credits Completed</div>
+            <div style={{ fontFamily: "'Merriweather', serif", fontWeight: 700, fontSize: 40, lineHeight: 1 }}>
+              <span style={{ color: "#b5b0a8" }}>67</span>
+              <span style={{ color: "#9aafa0", fontSize: 22, fontWeight: 400 }}> / 120</span>
+            </div>
+          </div>
+          <span style={{ background: "rgba(181, 176, 168, 0.12)", color: "#b5b0a8", fontSize: 10, fontWeight: 700, padding: "4px 10px", borderRadius: 20, border: "1px solid rgba(181, 176, 168, 0.25)", letterSpacing: "0.05em" }}>56%</span>
+        </div>
+        <div style={{ marginTop: 18 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#9aafa0", marginBottom: 6 }}>
+            <span>Progress to degree</span><span>53 remaining</span>
+          </div>
+          <div style={{ background: "#2a5636", borderRadius: 4, height: 5, overflow: "hidden" }}>
+            <div style={{ background: "linear-gradient(90deg, #b5b0a8, #ccc9c2)", width: "56%", height: "100%", borderRadius: 4 }} />
+          </div>
+        </div>
+      </div>
+
+      {/* Aid Status */}
+      <div className="tw-card" style={{ padding: 24, borderRadius: 8 }}>
+        <div>
+          <div style={{ fontSize: 11, color: "#9aafa0", textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 600, marginBottom: 8 }}>Financial Aid</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#4ade80", display: "inline-block", boxShadow: "0 0 8px rgba(74, 222, 128, 0.7)", flexShrink: 0 }} />
+            <span style={{ fontFamily: "'Merriweather', serif", fontWeight: 700, fontSize: 30, color: "#4ade80" }}>Active</span>
+          </div>
+        </div>
+        <div style={{ marginTop: 18, paddingTop: 14, borderTop: "1px solid #2a5636", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <div>
+            <div style={{ fontSize: 11, color: "#9aafa0" }}>Next review</div>
+            <div style={{ fontSize: 14, color: "#ffffff", fontWeight: 600, marginTop: 2 }}>Dec 2026</div>
+          </div>
+          <div>
+            <div style={{ fontSize: 11, color: "#9aafa0" }}>Aid type</div>
+            <div style={{ fontSize: 14, color: "#ffffff", fontWeight: 600, marginTop: 2 }}>FAFSA + Merit</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Risk feed ─────────────────────────────────────────────────────────────────
+
+function RiskFeed() {
+  return (
+    <section style={{ marginBottom: 36 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <h2 style={{ fontFamily: "'Merriweather', serif", fontWeight: 700, fontSize: 17, margin: 0 }}>Risk Feed</h2>
+          <span style={{ background: "rgba(37, 99, 235, 0.15)", color: "#2563eb", fontSize: 10, fontWeight: 700, padding: "2px 10px", borderRadius: 20, border: "1px solid rgba(37, 99, 235, 0.4)", letterSpacing: "0.05em" }}>3 ACTIVE</span>
+        </div>
+        <button className="tw-btn-ghost" style={{ color: "#ffffff", fontWeight: 600 }} onClick={() => console.log("TODO: view all risks")}>View all →</button>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {RISK_CARDS.map((card) => <RiskCardItem key={card.id} card={card} />)}
+      </div>
+    </section>
+  )
+}
+
+function RiskCardItem({ card }: { card: RiskCard }) {
+  return (
+    <div className="tw-risk-card" style={{ borderLeftColor: card.borderColor, padding: "18px 22px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 8 }}>
+        <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#ffffff", lineHeight: 1.4, fontFamily: "'Merriweather', serif" }}>{card.title}</h3>
+        <span style={{ background: card.badgeColor, color: "#111e14", fontSize: 10, fontWeight: 800, padding: "3px 9px", borderRadius: 4, letterSpacing: "0.08em", flexShrink: 0, marginTop: 2 }}>{card.badgeText}</span>
+      </div>
+      <p style={{ margin: "0 0 16px", fontSize: 13, color: "#9aafa0", lineHeight: 1.65 }}>{card.description}</p>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <button className="tw-btn-primary" style={{ fontSize: 12, padding: "6px 14px" }} onClick={() => console.log(`TODO: view action steps for risk ${card.id}`)}>View Action Steps</button>
+        <button className="tw-btn-outline" style={{ fontSize: 12, padding: "6px 14px" }} onClick={() => console.log(`TODO: dismiss risk ${card.id}`)}>Dismiss</button>
+      </div>
+    </div>
+  )
+}
+
+// ── Action center ─────────────────────────────────────────────────────────────
+
+function ActionCenter() {
+  const [checked, setChecked] = useState<Set<number>>(new Set())
+  const toggle = (id: number) => {
+    setChecked((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); console.log(`TODO: toggle action ${id}`); return n })
+  }
+  return (
+    <section style={{ marginBottom: 48 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <h2 style={{ fontFamily: "'Merriweather', serif", fontWeight: 700, fontSize: 17, margin: 0 }}>Action Center</h2>
+          <span style={{ background: "rgba(234, 88, 12, 0.15)", color: "#ea580c", fontSize: 10, fontWeight: 700, padding: "2px 10px", borderRadius: 20, border: "1px solid rgba(234, 88, 12, 0.4)", letterSpacing: "0.05em" }}>{ACTION_ITEMS.length - checked.size} PENDING</span>
+        </div>
+        <button className="tw-btn-ghost" style={{ color: "#ffffff", fontWeight: 600 }} onClick={() => console.log("TODO: view all actions")}>View all →</button>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {ACTION_ITEMS.map((item) => {
+          const done = checked.has(item.id)
+          return (
+            <div key={item.id} className="tw-card" style={{ borderRadius: 8, padding: "16px 20px", display: "flex", alignItems: "center", gap: 14, opacity: done ? 0.5 : 1, transition: "opacity 0.2s ease" }}>
+              <input type="checkbox" checked={done} onChange={() => toggle(item.id)} style={{ width: 16, height: 16, accentColor: "#b5b0a8", cursor: "pointer", flexShrink: 0 }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 500, color: done ? "#9aafa0" : "#ffffff", textDecoration: done ? "line-through" : "none", marginBottom: 4 }}>{item.title}</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <span style={{ background: `${item.tagColor}20`, color: item.tagColor, fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 4, letterSpacing: "0.06em" }}>{item.tag}</span>
+                  <span style={{ fontSize: 12, color: "#9aafa0" }}>{item.meta}</span>
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                <button className="tw-btn-outline" style={{ fontSize: 12, padding: "6px 12px" }} onClick={() => console.log(`TODO: mark done ${item.id}`)}>Mark Done</button>
+                <button className="tw-btn-ghost" style={{ fontSize: 12 }} onClick={() => console.log(`TODO: learn more ${item.id}`)}>Learn More</button>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </section>
+  )
+}
+
+// ── Advisor panel ─────────────────────────────────────────────────────────────
+
+function AdvisorPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [input, setInput] = useState("")
+  const handleSend = () => { if (!input.trim()) return; console.log(`TODO: send: ${input}`); setInput("") }
+  return (
+    <div className="tw-advisor-panel" style={{ position: "fixed", top: 0, right: 0, width: 390, height: "100vh", background: "linear-gradient(to top, #2e5236, #3a4440)", borderLeft: "1px solid #2a5636", display: "flex", flexDirection: "column", transform: open ? "translateX(0)" : "translateX(100%)", transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)", zIndex: 50, boxShadow: open ? "-8px 0 40px rgba(0,0,0,0.5)" : "none" }}>
+      <div style={{ padding: "20px 24px", borderBottom: "1px solid #2a5636", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+        <div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+            <Compass size={18} color="#b5b0a8" strokeWidth={1.75} />
+            <span style={{ fontFamily: "'Merriweather', serif", fontWeight: 700, fontSize: 17 }}>Trail Guide</span>
+          </div>
+          <div style={{ fontSize: 12, color: "#9aafa0" }}>Ask anything about your school&apos;s policies</div>
+        </div>
+        <button className="tw-icon-btn" onClick={onClose} aria-label="Close" style={{ fontSize: 16, marginTop: 2 }}>✕</button>
+      </div>
+      <div style={{ padding: "14px 24px", borderBottom: "1px solid #2a5636" }}>
+        <div style={{ fontSize: 10, color: "#9aafa0", marginBottom: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>Suggested</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {SUGGESTED_QUESTIONS.map((q) => <button key={q} className="tw-pill" onClick={() => setInput(q)} style={{ textAlign: "left" }}>{q}</button>)}
+        </div>
+      </div>
+      <div style={{ flex: 1, padding: "20px 24px", overflowY: "auto", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ textAlign: "center", color: "#9aafa0" }}>
+          <div style={{ width: 52, height: 52, borderRadius: "50%", background: "rgba(181, 176, 168, 0.1)", border: "1px solid rgba(181, 176, 168, 0.2)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px" }}>
+            <SherpaLogo size={26} />
+          </div>
+          <div style={{ fontSize: 14, fontWeight: 500, color: "#ffffff", marginBottom: 6 }}>Ask me anything</div>
+          <div style={{ fontSize: 13, lineHeight: 1.6 }}>I can help with your school&apos;s academic policies,<br />financial aid rules, and registration info.</div>
+        </div>
+      </div>
+      <div style={{ padding: "16px 24px", borderTop: "1px solid #2a5636", display: "flex", gap: 8, background: "#162a18" }}>
+        <input className="tw-chat-input" value={input} onChange={(e) => setInput(e.target.value)} placeholder="Type your question..." onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend() } }} style={{ flex: 1, background: "#1e3828", border: "1px solid #2a5636", borderRadius: 10, padding: "11px 14px", color: "#ffffff", fontSize: 14, outline: "none" }} />
+        <button className="tw-btn-primary" onClick={handleSend} style={{ padding: "11px 20px", borderRadius: 10 }}>Send</button>
+      </div>
+    </div>
   )
 }
