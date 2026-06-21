@@ -13,25 +13,16 @@
     --card-foreground: 222.2 47.4% 11.2%;
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 47.4% 11.2%;
-
-    /* Green primary */
     --primary: 142 69% 34%;
     --primary-foreground: 0 0% 100%;
-
-    /* Light pink secondary */
-    --secondary: 340 82% 95%;
-    --secondary-foreground: 340 50% 35%;
-
+    --secondary: 30 10% 88%;
+    --secondary-foreground: 30 8% 30%;
     --muted: 210 20% 96%;
     --muted-foreground: 215.4 16.3% 46.9%;
-
-    /* Light pink accent */
-    --accent: 340 82% 95%;
-    --accent-foreground: 340 50% 35%;
-
+    --accent: 30 10% 88%;
+    --accent-foreground: 30 8% 30%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 100%;
-
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
     --ring: 142 69% 34%;
@@ -47,12 +38,12 @@
     --popover-foreground: 210 40% 98%;
     --primary: 142 60% 45%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 340 30% 20%;
-    --secondary-foreground: 340 82% 85%;
+    --secondary: 30 8% 22%;
+    --secondary-foreground: 30 10% 80%;
     --muted: 217.2 32.6% 17.5%;
     --muted-foreground: 215 20.2% 65.1%;
-    --accent: 340 30% 20%;
-    --accent-foreground: 340 82% 85%;
+    --accent: 30 8% 22%;
+    --accent-foreground: 30 10% 80%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
     --border: 217.2 32.6% 17.5%;
@@ -62,17 +53,30 @@
 }
 
 @layer base {
-  * {
-    @apply border-border;
-  }
+  * { @apply border-border; }
   body {
     @apply bg-background text-foreground;
+    font-family: 'Satoshi', sans-serif;
   }
 
   ::-webkit-scrollbar { width: 6px; }
-  ::-webkit-scrollbar-track { background: #0a1a0f; }
-  ::-webkit-scrollbar-thumb { background: #1e3d28; border-radius: 3px; }
-  ::-webkit-scrollbar-thumb:hover { background: #2d5a3d; }
+  ::-webkit-scrollbar-track { background: #162a18; }
+  ::-webkit-scrollbar-thumb { background: #2a5636; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #3a7044; }
+}
+
+/* ── Brand wordmark ───────────────────────────────── */
+.nav-brand {
+  font-family: 'Satoshi', sans-serif;
+  font-weight: 700;
+  font-size: 22px;
+  background: linear-gradient(to right, #2a7038, #b5b0a8);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -0.4px;
+  -webkit-text-stroke: 0.6px rgba(255, 255, 255, 0.3);
+  paint-order: stroke fill;
 }
 
 /* ── Sidebar nav ─────────────────────────────────── */
@@ -84,7 +88,8 @@
   padding: 10px 14px;
   border-radius: 8px;
   cursor: pointer;
-  color: #a3c4a8;
+  color: #9aafa0;
+  font-family: 'Satoshi', sans-serif;
   font-size: 14px;
   font-weight: 500;
   background: none;
@@ -93,44 +98,47 @@
   text-align: left;
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
-.tw-nav-link:hover { background: rgba(30, 61, 40, 0.7); color: #ffffff; }
-.tw-nav-link.active { border-left-color: #ffadc8; color: #ffadc8; background: rgba(255, 173, 200, 0.08); }
+.tw-nav-link:hover { background: rgba(44, 86, 56, 0.7); color: #ffffff; }
+.tw-nav-link.active { border-left-color: #b5b0a8; color: #b5b0a8; background: rgba(181, 176, 168, 0.08); }
 
 /* ── Buttons ─────────────────────────────────────── */
 .tw-btn-primary {
-  background: #ffadc8;
-  color: #ffffff;
+  background: linear-gradient(to top, #4a8e50, #8a9490);
+  color: #111e14;
   border: none;
   border-radius: 8px;
   padding: 8px 18px;
   cursor: pointer;
-  font-weight: 500;
+  font-family: 'Satoshi', sans-serif;
+  font-weight: 700;
   font-size: 14px;
   white-space: nowrap;
   transition: filter 0.15s ease, transform 0.1s ease;
 }
-.tw-btn-primary:hover { filter: brightness(1.12); }
+.tw-btn-primary:hover { filter: brightness(1.1); }
 .tw-btn-primary:active { transform: scale(0.97); }
 
 .tw-btn-outline {
   background: transparent;
-  color: #ffadc8;
-  border: 1px solid #ffadc8;
+  color: #b5b0a8;
+  border: 1px solid #b5b0a8;
   border-radius: 8px;
   padding: 8px 18px;
   cursor: pointer;
+  font-family: 'Satoshi', sans-serif;
   font-weight: 500;
   font-size: 14px;
   white-space: nowrap;
   transition: background 0.15s ease;
 }
-.tw-btn-outline:hover { background: rgba(255, 173, 200, 0.12); }
+.tw-btn-outline:hover { background: rgba(181, 176, 168, 0.12); }
 
 .tw-btn-ghost {
   background: none;
   border: none;
-  color: #a3c4a8;
+  color: #9aafa0;
   cursor: pointer;
+  font-family: 'Satoshi', sans-serif;
   font-size: 13px;
   padding: 4px 8px;
   border-radius: 6px;
@@ -142,7 +150,7 @@
 .tw-icon-btn {
   background: none;
   border: none;
-  color: #a3c4a8;
+  color: #9aafa0;
   cursor: pointer;
   padding: 6px;
   border-radius: 6px;
@@ -153,42 +161,43 @@
 
 /* ── Cards ───────────────────────────────────────── */
 .tw-card {
-  background: #112318;
-  border: 1px solid #1e3d28;
-  border-radius: 16px;
+  background: linear-gradient(to top, #2e5236, #3a4440);
+  border: 1px solid #2a5636;
+  border-radius: 8px;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
-.tw-card:hover { border-color: #2d5a3d; box-shadow: 0 2px 16px rgba(0, 0, 0, 0.25); }
+.tw-card:hover { border-color: #3a7044; box-shadow: 0 2px 20px rgba(0, 0, 0, 0.35); }
 
 .tw-risk-card {
-  background: #112318;
-  border: 1px solid #1e3d28;
-  border-radius: 12px;
+  background: linear-gradient(to top, #2e5236, #3a4440);
+  border: 1px solid #2a5636;
+  border-radius: 8px;
   border-left-width: 4px;
   transition: box-shadow 0.15s ease;
 }
-.tw-risk-card:hover { box-shadow: 0 2px 16px rgba(0, 0, 0, 0.25); }
+.tw-risk-card:hover { box-shadow: 0 2px 20px rgba(0, 0, 0, 0.35); }
 
 /* ── Pill buttons ────────────────────────────────── */
 .tw-pill {
-  background: rgba(163, 196, 168, 0.08);
-  border: 1px solid #1e3d28;
-  color: #a3c4a8;
+  background: rgba(154, 175, 160, 0.08);
+  border: 1px solid #2a5636;
+  color: #9aafa0;
   border-radius: 20px;
   padding: 6px 14px;
+  font-family: 'Satoshi', sans-serif;
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
-.tw-pill:hover { background: rgba(255, 173, 200, 0.1); color: #ffadc8; border-color: rgba(255, 173, 200, 0.4); }
+.tw-pill:hover { background: rgba(181, 176, 168, 0.1); color: #b5b0a8; border-color: rgba(181, 176, 168, 0.4); }
 
 /* ── FAB ─────────────────────────────────────────── */
 .tw-fab { transition: transform 0.15s ease, box-shadow 0.15s ease !important; }
-.tw-fab:hover { transform: scale(1.08) !important; box-shadow: 0 6px 32px rgba(255, 173, 200, 0.55) !important; }
+.tw-fab:hover { transform: scale(1.08) !important; box-shadow: 0 6px 32px rgba(181, 176, 168, 0.4) !important; }
 
 /* ── Chat input ──────────────────────────────────── */
-.tw-chat-input:focus { outline: none; border-color: #ffadc8 !important; box-shadow: 0 0 0 3px rgba(255, 173, 200, 0.15); }
+.tw-chat-input:focus { outline: none; border-color: #b5b0a8 !important; box-shadow: 0 0 0 3px rgba(181, 176, 168, 0.15); }
 
 /* ── Responsive sidebar ──────────────────────────── */
 @media (max-width: 768px) {

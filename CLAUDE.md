@@ -216,7 +216,7 @@ cd mobile && npx expo start                                     # Expo Go / simu
 
 **Chat page** (`frontend/app/chat/page.tsx`):
 - Full RAG-grounded Q&A interface. Sends `POST /api/v1/chat/query` with `school_id` + `question`; renders the answer with a `Citations` block (source URL, heading, fetched date).
-- Animated message bubbles (user = pink gradient pill, assistant = card with thinking dots).
+- Animated message bubbles (user = stone gradient pill, assistant = card with thinking dots).
 - Suggested questions grid on empty state. `Enter` to send, `Shift+Enter` for newline.
 - Error state surfaced inline (no page crash).
 
@@ -226,9 +226,78 @@ cd mobile && npx expo start                                     # Expo Go / simu
 - "Action Steps" expands `action_packet_json` inline: numbered steps, deadline badge, office label, direct URL button.
 - Loading skeleton, empty state, resolved events collapsible section.
 
-**Dashboard routing** (`frontend/app/dashboard/page.tsx`):
-- Sidebar "Ask Advisor" and "Action Center" links now `router.push` to real pages instead of `console.log TODO`.
-- Floating 💬 FAB routes to `/chat`. Removed now-unused `advisorOpen` state and `AdvisorPanel`.
-
 **No new DB migrations or env vars required.**
 
+---
+
+## Design system (Sherpa Mountain Theme)
+
+The product was renamed **Sherpa** (from Tripwire). All user-facing text uses "Sherpa". Codebase folder/repo still named `tripwire`.
+
+### Fonts
+| Role | Family | Weight |
+|---|---|---|
+| Headings, stat numbers, card titles, brand | `'Merriweather', serif` | 700 / 900 |
+| Body, nav, buttons, labels, descriptions | `'Satoshi', sans-serif` | 400 / 500 / 700 |
+
+Loaded via `<link>` tags in `frontend/app/layout.tsx` (Google Fonts for Merriweather, Fontshare for Satoshi). Do **not** use `next/font` or CSS `@import` for these — the link-tag approach is more reliable across SSR and client hydration.
+
+### Color palette
+| Token | Hex | Usage |
+|---|---|---|
+| `--forest-deep` | `#0f1a10` | Sidebar bg, advisor footer |
+| `--forest-dark` | `#152219` | Card bg, page bg top |
+| `--forest-mid` | `#1a3320` | Page gradient top |
+| `--forest-light` | `#2d6030` | Button gradient end, hover accents |
+| `--border` | `#1e3828` | All card/panel borders |
+| `--border-hover` | `#2d5230` | Hover border state |
+| `--muted` | `#9aafa0` | Secondary text, labels |
+| `--stone-primary` | `#b5b0a8` | Primary accent (replaces pink), active nav, outlines |
+| `--stone-light` | `#ccc9c2` | Lighter stone, gradient stops |
+| `--stone-dark` | `#8a8680` | Darker stone, rgba borders |
+| `--slate` | `#252e2a` | Page gradient bottom |
+| `--warning` | `#facc15` | Warning severity badges |
+| `--success` | `#4ade80` | Safe/active status |
+
+### Key gradients
+```css
+/* Page background — forest green fading to slate */
+background: linear-gradient(180deg, #1a3320 0%, #252e2a 100%);
+
+/* Primary button — opposite direction: stone to vivid green */
+background: linear-gradient(135deg, #b5b0a8, #2d6030);
+
+/* Brand wordmark */
+background: linear-gradient(to right, #1e5228, #b5b0a8);
+```
+
+### Sherpa logo SVG
+
+A React component — use wherever the brand mark is needed (sidebar, auth pages, mobile header, email templates, etc.). Do **not** use the 🏔️ emoji or any other placeholder.
+
+```tsx
+function SherpaLogo({ size = 26 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Sherpa">
+      <path d="M14 3L26 23H2L14 3Z" stroke="#b5b0a8" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+      <path d="M14 3L10.5 11L14 9L17.5 11L14 3Z" fill="#b5b0a8" />
+    </svg>
+  )
+}
+```
+
+On light backgrounds swap stroke/fill to `#1e5228` (forest green). On dark backgrounds use `#b5b0a8` (stone) as shown above.
+
+No emojis anywhere in the UI — use Lucide React icons for all iconography (`lucide-react` is installed via shadcn/ui).
+
+### CSS classes (defined in `frontend/app/globals.css`)
+- `.nav-brand` — gradient wordmark, Satoshi 700, `-webkit-background-clip: text`
+- `.tw-nav-link` / `.tw-nav-link.active` — sidebar nav items; active uses stone accent
+- `.tw-btn-primary` — stone→green gradient button, dark text `#111e14`
+- `.tw-btn-outline` — stone-bordered transparent button
+- `.tw-btn-ghost` — muted text, no border
+- `.tw-card` — dark forest card with border and hover shadow
+- `.tw-risk-card` — card with colored left border for severity
+- `.tw-pill` — suggestion chip, stone hover
+- `.tw-fab` — floating action button, stone→green gradient
+- `.tw-chat-input:focus` — stone-colored focus ring
