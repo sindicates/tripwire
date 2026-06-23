@@ -615,7 +615,7 @@ export default function LandingPage() {
       {/* ── FOOTER ── */}
       <footer style={{
         background: '#1e3824',
-        padding: '16px 36px',
+        padding: '8px 36px 4px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',

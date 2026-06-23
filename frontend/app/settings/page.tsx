@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import {
   LayoutDashboard,
-  AlertTriangle,
   MessageSquare,
   ListChecks,
   Settings,
@@ -15,11 +14,10 @@ import {
   type LucideIcon,
 } from "lucide-react"
 
-type NavId = "dashboard" | "risk-feed" | "advisor" | "actions" | "timeline" | "settings"
+type NavId = "dashboard" | "advisor" | "actions" | "timeline" | "settings"
 
 const NAV_ITEMS: { id: NavId; Icon: LucideIcon; label: string }[] = [
   { id: "dashboard", Icon: LayoutDashboard, label: "Dashboard" },
-  { id: "risk-feed", Icon: AlertTriangle,   label: "Risk Feed" },
   { id: "advisor",   Icon: MessageSquare,   label: "Ask Advisor" },
   { id: "actions",   Icon: ListChecks,      label: "Action Center" },
   { id: "timeline",  Icon: Compass,         label: "Timeline" },
@@ -57,7 +55,6 @@ export default function SettingsPage() {
     else if (id === "advisor")  router.push("/chat")
     else if (id === "actions")  router.push("/actions")
     else if (id === "timeline") router.push("/deadline-radar")
-    else if (id === "risk-feed") router.push("/deadline-radar")
   }
 
   const name = profile?.display_name || "—"
@@ -73,7 +70,7 @@ export default function SettingsPage() {
           <div className="tw-sidebar-content-wrapper">
             <div style={{ width: 240, display: "flex", flexDirection: "column", minHeight: "100%", justifyContent: "space-between", flexShrink: 0 }}>
               <div>
-                <a href="/" style={{ display: "flex", alignItems: "center", gap: 10, padding: "28px 20px 32px", textDecoration: "none" }}>
+                <a href="/" className="tw-sidebar-logo" style={{ display: "flex", alignItems: "center", gap: 10, padding: "28px 12px 32px", textDecoration: "none" }}>
                   <img src="/logo.png" width={44} height={44} alt="Sherpa" style={{ objectFit: "contain" }} />
                   <span className="sidebar-brand tw-sidebar-logo-text">Sherpa</span>
                 </a>

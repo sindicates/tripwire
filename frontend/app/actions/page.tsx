@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import {
   LayoutDashboard,
-  AlertTriangle,
   MessageSquare,
   ListChecks,
   Compass,
@@ -25,7 +24,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type Severity = "info" | "warn" | "urgent"
-type NavId = "dashboard" | "risk-feed" | "advisor" | "actions" | "timeline" | "settings"
+type NavId = "dashboard" | "advisor" | "actions" | "timeline" | "settings"
 type IconComponent = React.ComponentType<LucideProps>
 
 interface ActionItem {
@@ -65,7 +64,6 @@ interface Profile { display_name: string | null; school: string | null; year: st
 
 const NAV_ITEMS: NavItem[] = [
   { id: "dashboard", Icon: LayoutDashboard, label: "Dashboard"     },
-  { id: "risk-feed", Icon: AlertTriangle,   label: "Risk Feed"     },
   { id: "advisor",   Icon: MessageSquare,   label: "Ask Advisor"   },
   { id: "actions",   Icon: ListChecks,      label: "Action Center" },
   { id: "timeline",  Icon: Compass,         label: "Timeline"      },
@@ -124,7 +122,7 @@ function Sidebar({ onNavClick, onSignOut, profile }: { onNavClick: (id: NavId) =
         <div className="tw-sidebar-content-wrapper">
           <div style={{ width: 240, display: "flex", flexDirection: "column", minHeight: "100%", justifyContent: "space-between", flexShrink: 0 }}>
             <div>
-              <a href="/" className="tw-sidebar-logo" style={{ display: "flex", alignItems: "center", gap: 10, padding: "28px 20px 32px", textDecoration: "none" }}>
+              <a href="/" className="tw-sidebar-logo" style={{ display: "flex", alignItems: "center", gap: 10, padding: "28px 12px 32px", textDecoration: "none" }}>
                 <SherpaLogo size={44} />
                 <span className="sidebar-brand tw-sidebar-logo-text">Sherpa</span>
               </a>
@@ -219,7 +217,6 @@ export default function ActionsPage() {
     if (id === "dashboard") router.push("/dashboard")
     else if (id === "advisor")  router.push("/chat")
     else if (id === "timeline") router.push("/deadline-radar")
-    else if (id === "risk-feed") router.push("/dashboard")
     else if (id === "settings") router.push("/settings")
   }
 
@@ -326,7 +323,7 @@ export default function ActionsPage() {
         {loading && (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {[1, 2, 3].map(i => (
-              <div key={i} style={{ background: "rgba(18,38,24,0.7)", border: "1px solid #2a5636", borderLeft: "4px solid #2a5636", borderRadius: 12, padding: "20px 24px", animation: "pulse 1.5s ease infinite" }}>
+              <div key={i} style={{ background: "rgba(18,38,24,0.7)", borderTop: "1px solid #2a5636", borderRight: "1px solid #2a5636", borderBottom: "1px solid #2a5636", borderLeft: "4px solid #2a5636", borderRadius: 12, padding: "20px 24px", animation: "pulse 1.5s ease infinite" }}>
                 <div style={{ height: 14, background: "#2a5636", borderRadius: 6, width: "55%", marginBottom: 12 }} />
                 <div style={{ height: 12, background: "#2a5636", borderRadius: 6, width: "80%", marginBottom: 8 }} />
                 <div style={{ height: 12, background: "#2a5636", borderRadius: 6, width: "45%" }} />
@@ -421,7 +418,9 @@ function RiskEventCard({ event, expanded, resolving, onExpand, onResolve, resolv
     <div
       style={{
         background: "rgba(18,38,24,0.75)",
-        border: "1px solid #2a5636",
+        borderTop: "1px solid #2a5636",
+        borderRight: "1px solid #2a5636",
+        borderBottom: "1px solid #2a5636",
         borderLeft: `4px solid ${resolved ? "#2a5636" : cfg.borderLeft}`,
         borderRadius: 12,
         padding: "18px 22px",
@@ -544,7 +543,7 @@ function triggerICSDownload(ics: string, filename: string): void {
 
 // ── Action packet detail ──────────────────────────────────────────────────────
 
-function ActionPacketDetail({ packet, eventId, userEmail }: { packet: ActionPacket; eventId: string; userEmail: string }) {
+function ActionPacketDetail({ packet, eventId, userEmail }: { packet: ActionPacket; eventId: string; userEmail: string; contextJson?: Record<string, unknown> | null; severity?: Severity }) {
   const [checkedSteps, setCheckedSteps] = useState<Set<number>>(() => {
     if (typeof window === "undefined") return new Set()
     try {

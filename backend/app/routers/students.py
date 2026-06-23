@@ -101,14 +101,17 @@ async def link_supabase_student(
             select(Student).where(Student.email == body.email)
         )).scalar_one_or_none()
 
-    # Try to match a school by name
+    # Find or create the school by name
     school_id: uuid.UUID | None = None
     if body.school_name:
         school = (await db.execute(
-            select(School).where(School.name.ilike(f"%{body.school_name[:40]}%"))
+            select(School).where(School.name.ilike(f"%{body.school_name[:60]}%"))
         )).scalar_one_or_none()
-        if school:
-            school_id = school.id
+        if school is None:
+            school = School(name=body.school_name)
+            db.add(school)
+            await db.flush()  # get id before commit
+        school_id = school.id
 
     if student is None:
         student = Student(

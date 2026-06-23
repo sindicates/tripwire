@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import {
   LayoutDashboard,
-  AlertTriangle,
   MessageSquare,
   ListChecks,
   Settings,
@@ -50,7 +49,7 @@ type DeadlineTemplate = Omit<Deadline, "id" | "dueDate"> & {
   anchorKey?: keyof SemesterDates
 }
 
-type NavId = "dashboard" | "risk-feed" | "advisor" | "actions" | "timeline" | "settings"
+type NavId = "dashboard" | "advisor" | "actions" | "timeline" | "settings"
 type IconComponent = React.ComponentType<LucideProps>
 interface NavItem { id: NavId; Icon: IconComponent; label: string }
 
@@ -112,7 +111,6 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
 const NAV_ITEMS: NavItem[] = [
   { id: "dashboard", Icon: LayoutDashboard, label: "Dashboard"     },
-  { id: "risk-feed", Icon: AlertTriangle,   label: "Risk Feed"     },
   { id: "advisor",   Icon: MessageSquare,   label: "Ask Advisor"   },
   { id: "actions",   Icon: ListChecks,      label: "Action Center" },
   { id: "timeline",  Icon: Compass,         label: "Timeline"      },
@@ -182,6 +180,50 @@ const INSTITUTIONAL_DEADLINES: Record<string, Omit<Deadline, "id">[]> = {
       description: "Submit your FAFSA for the upcoming year by this date to be considered for all need-based Penn grants.",
       actionLabel: "Open FAFSA", actionUrl: "https://studentaid.gov",
       sourceDoc: "Penn Student Financial Services — Annual Deadlines",
+    },
+    {
+      category: "academic", urgency: "warning", dueDate: "2026-09-08",
+      relevantToProfile: true,
+      title: "Fall 2026 Add / Drop Deadline",
+      description: "Last day to add or drop a course without a 'W' on your transcript. Drops after this date are recorded as withdrawals and count against your SAP completion ratio.",
+      sourceDoc: "Penn University Registrar — Academic Calendar 2026-27",
+    },
+    {
+      category: "academic", urgency: "info", dueDate: "2026-12-18",
+      relevantToProfile: true,
+      title: "Fall 2026 Final Exams End",
+      description: "Last day of Fall 2026 final exam period. Grade submission deadline for faculty follows shortly after — GPA updates that may trigger a SAP review will post within two weeks.",
+      sourceDoc: "Penn University Registrar — Academic Calendar 2026-27",
+    },
+    {
+      category: "registration", urgency: "warning", dueDate: "2026-11-10",
+      relevantToProfile: true,
+      title: "Spring 2027 Advance Registration Opens",
+      description: "Penn's advance registration period for Spring 2027. Registration order is determined by class standing and credits completed — log in to Path@Penn to check your time slot.",
+      actionLabel: "Open Path@Penn", actionUrl: "https://path.at.upenn.edu",
+      sourceDoc: "Penn University Registrar — Registration Procedures",
+    },
+    {
+      category: "academic", urgency: "warning", dueDate: "2027-01-28",
+      relevantToProfile: true,
+      title: "Spring 2027 Add / Drop Deadline",
+      description: "Last day to add or drop a Spring 2027 course without a withdrawal notation. Affects your SAP completion rate if you drop below the 67% threshold.",
+      sourceDoc: "Penn University Registrar — Academic Calendar 2026-27",
+    },
+    {
+      category: "financial-aid", urgency: "warning", dueDate: "2026-08-15",
+      relevantToProfile: true,
+      title: "Fall 2026 Tuition Payment Deadline",
+      description: "Penn Student Financial Services requires tuition to be paid or a payment plan established by this date to avoid a late fee and potential course cancellation.",
+      actionLabel: "Penn Student Accounts", actionUrl: "https://srfs.upenn.edu/student-accounts",
+      sourceDoc: "Penn Student Financial Services — Tuition Billing",
+    },
+    {
+      category: "scholarship", urgency: "info", dueDate: "2027-02-01",
+      relevantToProfile: true,
+      title: "Benjamin Franklin Scholars Application",
+      description: "Deadline for current Penn students to apply for the Benjamin Franklin Scholars program, which offers research funding and academic enrichment grants.",
+      sourceDoc: "Penn College of Arts & Sciences — Scholarships & Awards",
     },
   ],
   "case western reserve university": [
@@ -637,7 +679,7 @@ function SherpaLogo({ size = 26 }: { size?: number }) {
 
 // ── Sidebar ───────────────────────────────────────────────────────────────────
 
-function Sidebar({ onNavClick, profile }: { onNavClick: (id: NavId) => void; profile: Profile }) {
+function Sidebar({ onNavClick, onSignOut, profile }: { onNavClick: (id: NavId) => void; onSignOut: () => void; profile: Profile }) {
   const name     = profile.display_name || "—"
   const initials = name === "—" ? "—" : name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase()
   const subtitle = [profile.school, profile.year].filter(Boolean).join(" · ") || "—"
@@ -648,7 +690,7 @@ function Sidebar({ onNavClick, profile }: { onNavClick: (id: NavId) => void; pro
         <div className="tw-sidebar-content-wrapper">
           <div style={{ width: 240, display: "flex", flexDirection: "column", minHeight: "100%", justifyContent: "space-between", flexShrink: 0 }}>
             <div>
-              <a href="/" className="tw-sidebar-logo" style={{ display: "flex", alignItems: "center", gap: 10, padding: "28px 20px 32px", textDecoration: "none" }}>
+              <a href="/" className="tw-sidebar-logo" style={{ display: "flex", alignItems: "center", gap: 10, padding: "28px 12px 32px", textDecoration: "none" }}>
                 <SherpaLogo size={44} />
                 <span className="sidebar-brand tw-sidebar-logo-text">Sherpa</span>
               </a>
@@ -675,6 +717,7 @@ function Sidebar({ onNavClick, profile }: { onNavClick: (id: NavId) => void; pro
                   <div style={{ fontSize: 11, color: "#9aafa0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{subtitle}</div>
                 </div>
               </div>
+              <button className="tw-btn-ghost tw-sidebar-label" onClick={onSignOut} style={{ fontSize: 12, textAlign: "left", padding: "4px 0", color: "#9aafa0" }}>Sign out →</button>
             </div>
           </div>
         </div>
@@ -747,11 +790,17 @@ export default function DeadlineRadarPage() {
     init()
   }, [router])
 
+  async function signOut() {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.push("/login")
+    router.refresh()
+  }
+
   function handleNavClick(id: NavId) {
     if (id === "dashboard") router.push("/dashboard")
     else if (id === "advisor") router.push("/chat")
     else if (id === "actions") router.push("/actions")
-    else if (id === "risk-feed") router.push("/dashboard")
     else if (id === "settings") router.push("/settings")
   }
 
@@ -782,7 +831,7 @@ export default function DeadlineRadarPage() {
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: "linear-gradient(180deg, #2e5a3c 0%, #8faaa4 60%)", backgroundAttachment: "fixed", color: "#ffffff", fontFamily: "'Satoshi', sans-serif" }}>
 
-      <Sidebar onNavClick={handleNavClick} profile={profile} />
+      <Sidebar onNavClick={handleNavClick} onSignOut={signOut} profile={profile} />
 
       <main style={{ flex: 1, overflowY: "auto", padding: "36px 44px", minWidth: 0 }}>
 
@@ -879,7 +928,7 @@ export default function DeadlineRadarPage() {
                       {/* Card */}
                       <div
                         onClick={() => setSelectedId(isSel ? null : d.id)}
-                        style={{ position: "absolute", left: d.x - CARD_W / 2, top, width: CARD_W, height: CARD_H, background: isSel ? C.bg : "transparent", border: `1px solid ${isSel ? C.color : "#2a5636"}`, borderLeft: `3px solid ${C.color}`, borderRadius: 2, padding: "10px 11px", cursor: "pointer", overflow: "hidden", transition: "border-color 0.15s, background 0.15s", zIndex: 3, boxSizing: "border-box" }}
+                        style={{ position: "absolute", left: d.x - CARD_W / 2, top, width: CARD_W, height: CARD_H, background: isSel ? C.bg : "transparent", borderTop: `1px solid ${isSel ? C.color : "#2a5636"}`, borderRight: `1px solid ${isSel ? C.color : "#2a5636"}`, borderBottom: `1px solid ${isSel ? C.color : "#2a5636"}`, borderLeft: `3px solid ${C.color}`, borderRadius: 2, padding: "10px 11px", cursor: "pointer", overflow: "hidden", transition: "border-color 0.15s, background 0.15s", zIndex: 3, boxSizing: "border-box" }}
                         onMouseEnter={e => { if (!isSel) { const el = e.currentTarget as HTMLDivElement; el.style.borderColor = C.color; el.style.background = C.bg } }}
                         onMouseLeave={e => { if (!isSel) { const el = e.currentTarget as HTMLDivElement; el.style.borderColor = "#2a5636"; el.style.background = "transparent" } }}
                       >

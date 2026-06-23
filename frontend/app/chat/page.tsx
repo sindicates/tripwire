@@ -7,7 +7,6 @@ import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import {
   LayoutDashboard,
-  AlertTriangle,
   MessageSquare,
   ListChecks,
   Settings,
@@ -35,7 +34,7 @@ interface Message {
   error?: boolean
 }
 
-type NavId = "dashboard" | "risk-feed" | "advisor" | "actions" | "timeline" | "settings"
+type NavId = "dashboard" | "advisor" | "actions" | "timeline" | "settings"
 type IconComponent = React.ComponentType<LucideProps>
 interface NavItem { id: NavId; Icon: IconComponent; label: string }
 
@@ -49,7 +48,6 @@ interface Profile {
 
 const NAV_ITEMS: NavItem[] = [
   { id: "dashboard", Icon: LayoutDashboard, label: "Dashboard"     },
-  { id: "risk-feed", Icon: AlertTriangle,   label: "Risk Feed"     },
   { id: "advisor",   Icon: MessageSquare,   label: "Ask Advisor"   },
   { id: "actions",   Icon: ListChecks,      label: "Action Center" },
   { id: "timeline",  Icon: Compass,         label: "Timeline"      },
@@ -92,7 +90,7 @@ function Sidebar({ onNavClick, onSignOut, profile }: { onNavClick: (id: NavId) =
         <div className="tw-sidebar-content-wrapper">
           <div style={{ width: 240, display: "flex", flexDirection: "column", minHeight: "100%", justifyContent: "space-between", flexShrink: 0 }}>
             <div>
-              <a href="/" className="tw-sidebar-logo" style={{ display: "flex", alignItems: "center", gap: 10, padding: "28px 20px 32px", textDecoration: "none" }}>
+              <a href="/" className="tw-sidebar-logo" style={{ display: "flex", alignItems: "center", gap: 10, padding: "28px 12px 32px", textDecoration: "none" }}>
                 <SherpaLogo size={44} />
                 <span className="sidebar-brand tw-sidebar-logo-text">Sherpa</span>
               </a>
@@ -218,7 +216,6 @@ export default function ChatPage() {
     if (id === "dashboard") router.push("/dashboard")
     else if (id === "actions")  router.push("/actions")
     else if (id === "timeline") router.push("/deadline-radar")
-    else if (id === "risk-feed") router.push("/dashboard")
     else if (id === "settings") router.push("/settings")
   }
 
@@ -235,7 +232,15 @@ export default function ChatPage() {
       const res = await fetch(`${API_BASE}/api/v1/chat/query`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ school_id: schoolId, question, risk_id: riskId }),
+        body: JSON.stringify({
+          school_id: schoolId,
+          school_name: profile.school,
+          question,
+          risk_id: riskId,
+          history: messages
+            .filter(m => !m.isStreaming && m.content)
+            .map(m => ({ role: m.role, content: m.content })),
+        }),
       })
       if (!res.ok) throw new Error(await res.text() || `HTTP ${res.status}`)
       const data = await res.json()

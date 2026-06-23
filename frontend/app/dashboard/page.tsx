@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import {
   LayoutDashboard,
-  AlertTriangle,
   MessageSquare,
   ListChecks,
   Settings,
@@ -19,7 +18,7 @@ const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type NavId = "dashboard" | "risk-feed" | "advisor" | "actions" | "timeline" | "settings"
+type NavId = "dashboard" | "advisor" | "actions" | "timeline" | "settings"
 type IconComponent = React.ComponentType<LucideProps>
 interface NavItem { id: NavId; Icon: IconComponent; label: string }
 
@@ -76,7 +75,6 @@ interface RiskEvent {
 
 const NAV_ITEMS: NavItem[] = [
   { id: "dashboard", Icon: LayoutDashboard, label: "Dashboard" },
-  { id: "risk-feed", Icon: AlertTriangle,   label: "Risk Feed" },
   { id: "advisor",   Icon: MessageSquare,   label: "Ask Advisor" },
   { id: "actions",   Icon: ListChecks,      label: "Action Center" },
   { id: "timeline",  Icon: Compass,         label: "Timeline" },
@@ -211,7 +209,6 @@ export default function SherpaDashboard() {
     else if (id === "actions")  router.push("/actions")
     else if (id === "settings") router.push("/settings")
     else if (id === "timeline") router.push("/deadline-radar")
-    else if (id === "risk-feed") router.push("/deadline-radar")
   }
 
   const activeEvents = riskEvents.filter(e => e.resolved_at === null).sort(sevSort)
@@ -263,7 +260,7 @@ function Sidebar({ activeNav, onNavClick, onSignOut, profile }: { activeNav: Nav
         <div className="tw-sidebar-content-wrapper">
           <div style={{ width: 240, display: "flex", flexDirection: "column", minHeight: "100%", justifyContent: "space-between", flexShrink: 0 }}>
             <div>
-              <a href="/" className="tw-sidebar-logo" style={{ display: "flex", alignItems: "center", gap: 10, padding: "28px 20px 32px", textDecoration: "none" }}>
+              <a href="/" className="tw-sidebar-logo" style={{ display: "flex", alignItems: "center", gap: 10, padding: "28px 12px 32px", textDecoration: "none" }}>
                 <SherpaLogo size={44} />
                 <span className="sidebar-brand tw-sidebar-logo-text">Sherpa</span>
               </a>

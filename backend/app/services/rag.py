@@ -290,7 +290,9 @@ class RAGService:
 
     def _knowledge_system(self, school_name: str) -> str:
         return (
-            f"You are a knowledgeable academic advisor for {school_name}. "
+            f"You are Sherpa's AI academic advisor, helping a student at {school_name}. "
+            "Sherpa is an academic risk monitoring platform — you are its built-in advisor. "
+            "Never refer to yourself as anything other than Sherpa's advisor or 'the Sherpa advisor'. "
             "No indexed policy documents are currently available for this school. "
             "Answer using your training knowledge of this institution's financial aid policies, "
             "academic standing requirements, SAP policies, and appeal processes. "
@@ -306,14 +308,17 @@ class RAGService:
             "Omit the block entirely for purely informational answers."
         )
 
-    async def _knowledge_only_answer(self, query: str, school_name: str) -> dict:
+    async def _knowledge_only_answer(
+        self, query: str, school_name: str, history: list[dict] | None = None
+    ) -> dict:
         """Answer using Claude's training knowledge when no docs are ingested."""
         try:
+            prior = [{"role": m["role"], "content": m["content"]} for m in (history or [])]
             msg = await self._get_anthropic().messages.create(
                 model="claude-sonnet-4-6",
                 max_tokens=1500,
                 system=self._knowledge_system(school_name),
-                messages=[{"role": "user", "content": query}],
+                messages=[*prior, {"role": "user", "content": query}],
             )
             full_text = msg.content[0].text
             action_packet = None
@@ -477,6 +482,7 @@ class RAGService:
         school_name: str,
         session: AsyncSession,
         risk_id: uuid.UUID | None = None,
+        history: list[dict] | None = None,
     ) -> dict:
         """Return {answer, citations} grounded in retrieved policy chunks."""
         # 1. Check if docs exist. If not, answer from Claude's training knowledge directly
@@ -485,13 +491,13 @@ class RAGService:
             select(DocChunk.id).where(DocChunk.school_id == school_id).limit(1)
         )
         if not chunks_exist_result.scalar():
-            return await self._knowledge_only_answer(query, school_name)
+            return await self._knowledge_only_answer(query, school_name, history)
 
         # 2. Search and generate answer, catching any external API quota/auth errors gracefully.
         try:
             chunks = await self.search(query, school_id, session)
             if not chunks:
-                return await self._knowledge_only_answer(query, school_name)
+                return await self._knowledge_only_answer(query, school_name, history)
 
             # 3. Dynamic subpage fetch: discover links from the school's financial aid URL,
             #    ask Claude which subpages are most likely to answer this question, fetch them live.
@@ -589,17 +595,19 @@ class RAGService:
                 + knowledge_supplement
             )
 
+            prior = [{"role": m["role"], "content": m["content"]} for m in (history or [])]
             msg = await self._get_anthropic().messages.create(
                 model="claude-sonnet-4-6",
                 max_tokens=1500,
                 system=system,
                 messages=[
+                    *prior,
                     {
                         "role": "user",
                         "content": (
                             f"{risk_context_str}Policy excerpts:\n{context_blocks}\n\nQuestion: {query}"
                         ),
-                    }
+                    },
                 ],
             )
 
@@ -659,6 +667,7 @@ class RAGService:
         school_name: str,
         session: AsyncSession,
         risk_id: uuid.UUID | None = None,
+        history: list[dict] | None = None,
     ) -> AsyncGenerator[dict, None]:
         """Yield SSE-compatible dicts: {type:'text', text} chunks then a final {type:'done'} payload."""
         _log = logging.getLogger("uvicorn")
@@ -744,7 +753,9 @@ class RAGService:
                 )
 
             system = (
-                f"You are a knowledgeable academic advisor for {school_name}. "
+                f"You are Sherpa's AI academic advisor, helping a student at {school_name}. "
+                "Sherpa is an academic risk monitoring platform — you are its built-in advisor. "
+                "Never refer to yourself as anything other than Sherpa's advisor or 'the Sherpa advisor'. "
                 "Your job is to help students understand their financial aid and academic policies. "
                 "You have been given policy excerpts below. Use them as your primary source, but reason like an advisor — not a search engine.\n\n"
                 "How to answer:\n"
@@ -768,15 +779,19 @@ class RAGService:
                 + knowledge_supplement
             )
 
+            prior = [{"role": m["role"], "content": m["content"]} for m in (history or [])]
             full_text = ""
             async with self._get_anthropic().messages.stream(
                 model="claude-sonnet-4-6",
                 max_tokens=1500,
                 system=system,
-                messages=[{
-                    "role": "user",
-                    "content": f"{risk_context_str}Policy excerpts:\n{context_blocks}\n\nQuestion: {query}",
-                }],
+                messages=[
+                    *prior,
+                    {
+                        "role": "user",
+                        "content": f"{risk_context_str}Policy excerpts:\n{context_blocks}\n\nQuestion: {query}",
+                    },
+                ],
             ) as stream:
                 async for text in stream.text_stream:
                     full_text += text
